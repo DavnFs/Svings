@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(Get-ChildItem:*)",
+      "Shell(ForEach-Object:*)",
+      "Shell(Get-Content:*)",
+      "Shell(Measure-Object:*)",
+      "Shell(.Lines,:*)",
+      "Shell(.Path:*)",
+      "Shell(}:*)",
+      "Shell(Sort-Object:*)",
+      "Shell(Where-Object:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

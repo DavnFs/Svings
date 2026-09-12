@@ -1,0 +1,31 @@
+name: cause_money_record
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  get: ^4.7.3
+  shared_preferences: ^2.5.5
+  http: ^1.6.0
+  intl: ^0.20.2
+
+  # Supabase
+  supabase_flutter: ^2.8.0
+  flutter_dotenv: ^5.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - asset/
+    - .env

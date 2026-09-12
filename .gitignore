@@ -1,0 +1,16 @@
+.env
+.dart_tool/
+.flutter-plugins-dependencies
+.flutter-plugins
+.packages
+build/
+.idea/
+.vscode/
+*.iml
+iOS/Pods/
+android/.gradle/
+android/app/build/
+android/build/
+ios/Runner.xcworkspace/xcuserdata/
+.mavis/
+*.log

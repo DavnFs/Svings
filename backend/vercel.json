@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/handler.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/ai_advisor.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/history/(.*)",
+      "dest": "api/handler.py"
+    },
+    {
+      "src": "/api/user/(.*)",
+      "dest": "api/handler.py"
+    },
+    {
+      "src": "/api/ai/(.*)",
+      "dest": "api/ai_advisor.py"
+    }
+  ],
+  "env": {
+    "GOOGLE_SERVICE_ACCOUNT_KEY": "@google_service_account_key",
+    "GOOGLE_SHEETS_ID": "@google_sheets_id"
+  }
+}

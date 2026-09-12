@@ -1,0 +1,157 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:cause_money_record/config/app_color.dart';
+import 'package:cause_money_record/config/app_format.dart';
+import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
+
+class DetailHistoryPage extends StatefulWidget {
+  final String idUser;
+  final String date;
+  final String type;
+
+  const DetailHistoryPage({
+    Key? key,
+    required this.idUser,
+    required this.date,
+    required this.type,
+  }) : super(key: key);
+
+  @override
+  State<DetailHistoryPage> createState() => _DetailHistoryPageState();
+}
+
+class _DetailHistoryPageState extends State<DetailHistoryPage> {
+  final cDetail = Get.put(CDetailHistory());
+
+  @override
+  void initState() {
+    super.initState();
+    cDetail.getData(widget.idUser, widget.date, widget.type);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isIncome = widget.type == 'Pemasukan';
+    return Scaffold(
+      backgroundColor: AppColor.surface,
+      appBar: AppBar(
+        backgroundColor: AppColor.card,
+        foregroundColor: AppColor.textPrimary,
+        elevation: 0,
+        title: Obx(() {
+          final d = cDetail.data;
+          if (d == null || d.date == null) return const SizedBox.shrink();
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                AppFormat.date(d.date!),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isIncome ? AppColor.income.withOpacity(0.1) : AppColor.outcome.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isIncome ? 'Income' : 'Expense',
+                  style: TextStyle(
+                    color: isIncome ? AppColor.income : AppColor.outcome,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
+      body: Obx(() {
+        final d = cDetail.data;
+        if (d == null || d.date == null) {
+          return const Center(
+            child: Text('No data', style: TextStyle(color: AppColor.textSecondary)),
+          );
+        }
+        final details = jsonDecode(d.details ?? '[]') as List;
+        return Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColor.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColor.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Total', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(
+                    AppFormat.currency(d.total ?? '0'),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppColor.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: details.length,
+                separatorBuilder: (_, __) => const Divider(height: 1, color: AppColor.border, indent: 16, endIndent: 16),
+                itemBuilder: (context, index) {
+                  final item = details[index] as Map;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColor.surface,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(color: AppColor.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            item['name'] ?? '',
+                            style: const TextStyle(fontSize: 15, color: AppColor.textPrimary),
+                          ),
+                        ),
+                        Text(
+                          AppFormat.currency(item['price']?.toString() ?? '0'),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColor.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}

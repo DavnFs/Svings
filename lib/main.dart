@@ -19,6 +19,53 @@ void main() async {
   runApp(const MyApp());
 }
 
+/// Single seed for both schemes. MD3 derives all ~30 color roles from this,
+/// replacing the hand-written palette where only 3 roles used to be set.
+const _seed = Color(0xFF6C63FF);
+
+/// Radius scale, derived from the values the screens already used inline.
+/// Flutter exposes shapes per component rather than as a global token set, so
+/// these are applied to each component theme below — one place to change
+/// instead of 84 scattered `BorderRadius.circular()` literals.
+const _radiusSmall = 12.0;   // inputs, chips, outlined buttons
+const _radiusButton = 14.0;  // primary action buttons
+const _radiusCard = 16.0;    // cards and panels
+const _radiusSheet = 20.0;   // dialogs and sheets
+
+RoundedRectangleBorder _rounded(double radius) =>
+    RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
+
+ThemeData _buildTheme(Brightness brightness) {
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(seedColor: _seed, brightness: brightness),
+  );
+
+  return base.copyWith(
+    scaffoldBackgroundColor: AppColor.surface,
+    textTheme: base.textTheme.copyWith(
+      headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+      titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+      titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    ),
+    cardTheme: CardThemeData(shape: _rounded(_radiusCard)),
+    dialogTheme: DialogThemeData(shape: _rounded(_radiusSheet)),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        elevation: 0,
+        shape: _rounded(_radiusButton),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: _rounded(_radiusSmall),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+    ),
+  );
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -26,28 +73,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: AppColor.surface,
-        colorScheme: const ColorScheme.light(
-          primary: AppColor.primary,
-          secondary: AppColor.accent,
-          surface: AppColor.card,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: AppColor.primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: false,
-        ),
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: AppColor.textPrimary,
-          ),
-        ),
-      ),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
+      // ponytail: pinned to light until the screens stop hardcoding AppColor.
+      // Flipping to ThemeMode.system is the last step of the screen sweep.
+      themeMode: ThemeMode.light,
       home: FutureBuilder(
         future: Session.getUser(),
         builder: (context, AsyncSnapshot<User> snapshot) {

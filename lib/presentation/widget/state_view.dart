@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cause_money_record/config/app_color.dart';
 
 /// Reusable state widget — handles loading / error / empty / content
-/// in one place. Use with [StateView.snapshot] for AsyncSnapshot-style
-/// or [StateView.flags] for explicit boolean state.
+/// in one place. Pass explicit flags; every screen knows which state it is in.
 class StateView extends StatelessWidget {
   final bool loading;
   final String? error;
@@ -25,60 +24,6 @@ class StateView extends StatelessWidget {
     this.emptyTitle = 'Kosong',
     this.emptyIcon = Icons.inbox_outlined,
   });
-
-  /// Convenience constructor for AsyncSnapshot-style usage.
-  factory StateView.snapshot({
-    Key? key,
-    required AsyncSnapshot snapshot,
-    required Widget child,
-    VoidCallback? onRetry,
-    String emptyMessage = 'Belum ada data',
-    String emptyTitle = 'Kosong',
-    IconData emptyIcon = Icons.inbox_outlined,
-  }) {
-    if (snapshot.hasError) {
-      return StateView(
-        key: key,
-        loading: false,
-        error: snapshot.error.toString(),
-        empty: false,
-        child: child,
-        onRetry: onRetry,
-      );
-    }
-    if (!snapshot.hasData) {
-      return StateView(
-        key: key,
-        loading: true,
-        error: null,
-        empty: false,
-        child: child,
-        onRetry: onRetry,
-      );
-    }
-    final data = snapshot.data;
-    if (data == null || (data is Iterable && data.isEmpty)) {
-      return StateView(
-        key: key,
-        loading: false,
-        error: null,
-        empty: true,
-        child: child,
-        onRetry: onRetry,
-        emptyMessage: emptyMessage,
-        emptyTitle: emptyTitle,
-        emptyIcon: emptyIcon,
-      );
-    }
-    return StateView(
-      key: key,
-      loading: false,
-      error: null,
-      empty: false,
-      child: child,
-      onRetry: onRetry,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {

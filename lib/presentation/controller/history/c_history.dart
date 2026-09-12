@@ -23,16 +23,4 @@ class CHistory extends GetxController {
       _loading.value = false;
     }
   }
-
-  Future<void> search(String idUser, String date) async {
-    _loading.value = true;
-    _error.value = null;
-    try {
-      _list.assignAll(await SourceHistory.historySearch(idUser, date));
-    } catch (e) {
-      _error.value = e.toString();
-    } finally {
-      _loading.value = false;
-    }
-  }
 }

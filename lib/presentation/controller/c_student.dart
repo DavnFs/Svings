@@ -45,27 +45,4 @@ class CStudent extends GetxController {
       _loading.value = false;
     }
   }
-
-  /// Re-fetch the student by NIM (used by the search/lookup UI).
-  Future<void> loadByNim(String nim) async {
-    _loading.value = true;
-    _error.value = null;
-    try {
-      final s = await SourceStudent.getByNim(nim);
-      if (s == null) {
-        _error.value = 'Mahasiswa dengan NIM $nim tidak ditemukan';
-        _student.value = null;
-        return;
-      }
-      _student.value = s;
-      _currentEnrollments.assignAll(
-        await SourceStudent.getEnrollmentsBySemester(s.id, s.currentSemester),
-      );
-      _schedules.assignAll(await SourceStudent.getSchedules(s.id));
-    } catch (e) {
-      _error.value = e.toString();
-    } finally {
-      _loading.value = false;
-    }
-  }
 }

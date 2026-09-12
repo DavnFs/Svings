@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import 'package:cause_money_record/config/app_asset.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_format.dart';
@@ -10,8 +9,8 @@ import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/auth/login_page.dart';
-import 'package:cause_money_record/presentation/page/history/add_history_page.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
+import 'package:cause_money_record/presentation/page/history/history_form_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/student/student_dashboard_page.dart';
@@ -153,7 +152,7 @@ class _HomePageState extends State<HomePage> {
             Get.to(() => const StudentDashboardPage());
           }),
           _drawerItem(Icons.add_circle_outline, 'New Entry', () {
-            Get.to(() => AddHistoryPage())?.then((v) { if (v == true) _refresh(); });
+            Get.to(() => const HistoryFormPage())?.then((v) { if (v == true) _refresh(); });
           }),
           _drawerItem(Icons.arrow_downward_rounded, 'Income', () {
             Get.to(() => const IncomeOutcomePage(type: 'Pemasukan'));
@@ -199,24 +198,27 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: AppColor.primary, borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Obx(() => Text(AppFormat.currency(cHome.today.toString()),
+        Obx(() => Text(AppFormat.currency(cHome.today),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700, color: Colors.white))),
         const SizedBox(height: 4),
         Obx(() => Text(cHome.todayPercent, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13))),
         const SizedBox(height: 16),
-        GestureDetector(
-          onTap: () => Get.to(() => DetailHistoryPage(
-            date: DateFormat('yyyy-MM-dd').format(DateTime.now()), idUser: cUser.id, type: 'Pengeluaran')),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: const [
-              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-              SizedBox(width: 4),
-              Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-            ]),
-          ),
-        ),
+        Obx(() {
+          final todayId = cHome.todayId;
+          if (todayId == null) return const SizedBox.shrink();
+          return GestureDetector(
+            onTap: () => Get.to(() => DetailHistoryPage(idHistory: todayId)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+              ]),
+            ),
+          );
+        }),
       ]),
     );
   }
@@ -327,7 +329,7 @@ class _HomePageState extends State<HomePage> {
             child: Row(children: [
               const Text('Difference', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
               const Spacer(),
-              Text(AppFormat.currency(cHome.differentMonth.toString()),
+              Text(AppFormat.currency(cHome.differentMonth),
                 style: const TextStyle(color: AppColor.accent, fontSize: 14, fontWeight: FontWeight.w700)),
             ]),
           ),

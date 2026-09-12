@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.cause_money_record">
+    <!-- Required in the main manifest: debug/profile manifests declare INTERNET
+         for hot reload only, so a release build would have no network at all.
+         This app is Supabase-only, so every data path needs it. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
    <application
         android:label="cause_money_record"
         android:name="${applicationName}"

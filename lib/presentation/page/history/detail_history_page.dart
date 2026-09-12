@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_color.dart';
@@ -6,16 +5,9 @@ import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
 
 class DetailHistoryPage extends StatefulWidget {
-  final String idUser;
-  final String date;
-  final String type;
+  final String idHistory;
 
-  const DetailHistoryPage({
-    Key? key,
-    required this.idUser,
-    required this.date,
-    required this.type,
-  }) : super(key: key);
+  const DetailHistoryPage({Key? key, required this.idHistory}) : super(key: key);
 
   @override
   State<DetailHistoryPage> createState() => _DetailHistoryPageState();
@@ -27,12 +19,11 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
   @override
   void initState() {
     super.initState();
-    cDetail.getData(widget.idUser, widget.date, widget.type);
+    cDetail.getData(widget.idHistory);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isIncome = widget.type == 'Pemasukan';
     return Scaffold(
       backgroundColor: AppColor.surface,
       appBar: AppBar(
@@ -41,12 +32,13 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
         elevation: 0,
         title: Obx(() {
           final d = cDetail.data;
-          if (d == null || d.date == null) return const SizedBox.shrink();
+          if (d == null) return const SizedBox.shrink();
+          final isIncome = d.type == 'Pemasukan';
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                AppFormat.date(d.date!),
+                AppFormat.date(d.date),
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),
               const SizedBox(width: 8),
@@ -71,12 +63,12 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
       ),
       body: Obx(() {
         final d = cDetail.data;
-        if (d == null || d.date == null) {
+        if (d == null) {
           return const Center(
             child: Text('No data', style: TextStyle(color: AppColor.textSecondary)),
           );
         }
-        final details = jsonDecode(d.details ?? '[]') as List;
+        final items = d.items;
         return Column(
           children: [
             Container(
@@ -93,23 +85,30 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
                   const Text('Total', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
                   const SizedBox(height: 4),
                   Text(
-                    AppFormat.currency(d.total ?? '0'),
+                    AppFormat.currency(d.total),
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
                       color: AppColor.textPrimary,
                     ),
                   ),
+                  if (d.notes != null && d.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      d.notes!,
+                      style: const TextStyle(fontSize: 13, color: AppColor.textSecondary),
+                    ),
+                  ],
                 ],
               ),
             ),
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                itemCount: details.length,
+                itemCount: items.length,
                 separatorBuilder: (_, __) => const Divider(height: 1, color: AppColor.border, indent: 16, endIndent: 16),
                 itemBuilder: (context, index) {
-                  final item = details[index] as Map;
+                  final item = items[index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
                     child: Row(
@@ -131,12 +130,12 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            item['name'] ?? '',
+                            item.name,
                             style: const TextStyle(fontSize: 15, color: AppColor.textPrimary),
                           ),
                         ),
                         Text(
-                          AppFormat.currency(item['price']?.toString() ?? '0'),
+                          AppFormat.currency(num.tryParse(item.price) ?? 0),
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,

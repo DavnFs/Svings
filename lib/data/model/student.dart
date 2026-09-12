@@ -2,14 +2,9 @@
 /// `v_student_summary`.
 class Student {
   final String id;
-  final String? userId;
   final String nim;
   final String fullName;
   final String email;
-  final String? gender;
-  final DateTime? birthDate;
-  final String? address;
-  final String? phone;
   final String studyProgramId;
   final String studyProgramCode;
   final String studyProgramName;
@@ -19,23 +14,13 @@ class Student {
   final int cohortYear;
   final int currentSemester;
   final double gpa;
-  final int totalCredits;
   final String status;          // academic_status enum value
-  final int totalCourses;
-  final int coursesPassed;
-  final int totalAttended;
-  final int totalMeetings;
 
   const Student({
     required this.id,
-    this.userId,
     required this.nim,
     required this.fullName,
     required this.email,
-    this.gender,
-    this.birthDate,
-    this.address,
-    this.phone,
     required this.studyProgramId,
     required this.studyProgramCode,
     required this.studyProgramName,
@@ -45,25 +30,11 @@ class Student {
     required this.cohortYear,
     required this.currentSemester,
     required this.gpa,
-    required this.totalCredits,
     required this.status,
-    this.totalCourses = 0,
-    this.coursesPassed = 0,
-    this.totalAttended = 0,
-    this.totalMeetings = 0,
   });
-
-  /// Human-readable attendance percentage.
-  double get attendancePercent =>
-      totalMeetings == 0 ? 0 : (totalAttended / totalMeetings) * 100;
-
-  /// Pass rate across all enrolled courses.
-  double get passRate =>
-      totalCourses == 0 ? 0 : (coursesPassed / totalCourses) * 100;
 
   factory Student.fromViewJson(Map<String, dynamic> json) => Student(
         id: json['student_id'] as String,
-        userId: null, // not joined in the view
         nim: json['nim'] as String,
         fullName: json['full_name'] as String,
         email: json['email'] as String,
@@ -77,10 +48,6 @@ class Student {
         currentSemester: (json['current_semester'] as num).toInt(),
         gpa: (json['gpa'] as num).toDouble(),
         status: json['status'] as String,
-        totalCourses: (json['total_courses'] as num?)?.toInt() ?? 0,
-        coursesPassed: (json['courses_passed'] as num?)?.toInt() ?? 0,
-        totalAttended: (json['total_attended'] as num?)?.toInt() ?? 0,
-        totalMeetings: (json['total_meetings'] as num?)?.toInt() ?? 0,
       );
 }
 

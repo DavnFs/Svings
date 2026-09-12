@@ -11,6 +11,9 @@ class CHome extends GetxController {
   final _today = 0.0.obs;
   double get today => _today.value;
 
+  final _todayId = RxnString();
+  String? get todayId => _todayId.value;
+
   final _todayPercent = ''.obs;
   String get todayPercent => _todayPercent.value;
 
@@ -54,6 +57,7 @@ class CHome extends GetxController {
       final data = await SourceHistory.analysis(idUser);
 
       _today.value = (data['today'] as num).toDouble();
+      _todayId.value = data['todayId'] as String?;
       final yesterday = (data['yesterday'] as num).toDouble();
       final diff = (_today.value - yesterday).abs();
       final denominator = (_today.value + yesterday);

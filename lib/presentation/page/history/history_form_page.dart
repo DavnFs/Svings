@@ -1,42 +1,86 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_dialog.dart';
 import 'package:cause_money_record/config/app_format.dart';
+import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
-import 'package:cause_money_record/presentation/controller/history/c_add_history.dart';
+import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
 
-class AddHistoryPage extends StatelessWidget {
-  AddHistoryPage({Key? key}) : super(key: key);
+/// Create or edit a transaction. Pass [idHistory] to edit, omit it to create.
+///
+/// Merges the former AddHistoryPage and UpdateHistoryPage, which were the same
+/// form differing only in which SourceHistory method they called.
+class HistoryFormPage extends StatefulWidget {
+  final String? idHistory;
 
-  final cAdd = Get.put(CAddHistory());
+  const HistoryFormPage({Key? key, this.idHistory}) : super(key: key);
+
+  @override
+  State<HistoryFormPage> createState() => _HistoryFormPageState();
+}
+
+class _HistoryFormPageState extends State<HistoryFormPage> {
+  final c = Get.put(CHistoryForm());
   final cUser = Get.put(CUser());
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
 
-  Future<void> _submit(BuildContext context) async {
-    final success = await SourceHistory.add(
-      cUser.id, cAdd.date, cAdd.type,
-      jsonEncode(cAdd.items), cAdd.total.toString(),
-    );
+  bool get _isEditing => widget.idHistory != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) c.load(widget.idHistory!);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final success = _isEditing
+        ? await SourceHistory.update(
+            idHistory: widget.idHistory!,
+            idUser: cUser.id,
+            date: c.date,
+            type: c.type,
+            items: c.items,
+          )
+        : await SourceHistory.add(
+            idUser: cUser.id,
+            date: c.date,
+            type: c.type,
+            items: c.items,
+          );
+    if (!mounted) return;
     if (success) {
-      AppDialog.success(context, 'Berhasil Tambah History');
+      AppDialog.success(context, _isEditing ? 'Berhasil Update History' : 'Berhasil Tambah History');
       await Future.delayed(const Duration(seconds: 1));
       Get.back(result: true);
     } else {
-      AppDialog.error(context, 'Gagal Tambah History');
+      AppDialog.error(context, _isEditing ? 'Gagal Update History' : 'Gagal Tambah History');
     }
   }
 
   Future<void> _pickDate() async {
     final result = await showDatePicker(
-      context: Get.context!, initialDate: DateTime.now(),
+      context: context, initialDate: DateTime.now(),
       firstDate: DateTime(2022), lastDate: DateTime(DateTime.now().year + 1),
     );
-    if (result != null) cAdd.setDate(DateFormat('yyyy-MM-dd').format(result));
+    if (result != null) c.setDate(DateFormat('yyyy-MM-dd').format(result));
+  }
+
+  void _addItem() {
+    if (_nameController.text.isEmpty || _priceController.text.isEmpty) return;
+    c.addItem(HistoryItem(name: _nameController.text, price: _priceController.text));
+    _nameController.clear();
+    _priceController.clear();
   }
 
   @override
@@ -45,7 +89,8 @@ class AddHistoryPage extends StatelessWidget {
       backgroundColor: AppColor.surface,
       appBar: AppBar(
         backgroundColor: AppColor.card, foregroundColor: AppColor.textPrimary, elevation: 0,
-        title: const Text('New Entry', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(_isEditing ? 'Update Entry' : 'New Entry',
+          style: const TextStyle(fontWeight: FontWeight.w600)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -62,7 +107,7 @@ class AddHistoryPage extends StatelessWidget {
               child: Row(children: [
                 const Icon(Icons.calendar_today, size: 18, color: AppColor.textSecondary),
                 const SizedBox(width: 10),
-                Obx(() => Text(cAdd.date, style: const TextStyle(color: AppColor.textPrimary, fontSize: 14))),
+                Obx(() => Text(c.date, style: const TextStyle(color: AppColor.textPrimary, fontSize: 14))),
                 const Spacer(),
                 const Text('Change', style: TextStyle(color: AppColor.accent, fontSize: 13)),
               ]),
@@ -78,9 +123,9 @@ class AddHistoryPage extends StatelessWidget {
             ),
             child: Obx(() => DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: cAdd.type, isExpanded: true, dropdownColor: AppColor.card,
+                value: c.type, isExpanded: true, dropdownColor: AppColor.card,
                 items: ['Pemasukan', 'Pengeluaran'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (v) => cAdd.setType(v ?? 'Pemasukan'),
+                onChanged: (v) => c.setType(v ?? 'Pemasukan'),
               ),
             )),
           ),
@@ -94,12 +139,7 @@ class AddHistoryPage extends StatelessWidget {
           SizedBox(
             width: double.infinity, height: 44,
             child: OutlinedButton.icon(
-              onPressed: () {
-                if (_nameController.text.isEmpty || _priceController.text.isEmpty) return;
-                cAdd.addItem({'name': _nameController.text, 'price': _priceController.text});
-                _nameController.clear();
-                _priceController.clear();
-              },
+              onPressed: _addItem,
               icon: const Icon(Icons.add, size: 18), label: const Text('Add Item'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColor.accent, side: const BorderSide(color: AppColor.border),
@@ -117,15 +157,15 @@ class AddHistoryPage extends StatelessWidget {
               border: Border.all(color: AppColor.border),
             ),
             child: Obx(() {
-              if (cAdd.items.isEmpty) return const Text('No items added', style: TextStyle(color: AppColor.textSecondary, fontSize: 13));
+              if (c.items.isEmpty) return const Text('No items added', style: TextStyle(color: AppColor.textSecondary, fontSize: 13));
               return Wrap(
                 spacing: 8, runSpacing: 8,
-                children: List.generate(cAdd.items.length, (index) {
-                  final item = cAdd.items[index];
+                children: List.generate(c.items.length, (index) {
+                  final item = c.items[index];
                   return Chip(
-                    label: Text('${item['name']} - Rp${item['price']}', style: const TextStyle(fontSize: 12)),
+                    label: Text('${item.name} - Rp${item.price}', style: const TextStyle(fontSize: 12)),
                     deleteIcon: const Icon(Icons.close, size: 16),
-                    onDeleted: () => cAdd.deleteItem(index),
+                    onDeleted: () => c.deleteItem(index),
                     backgroundColor: AppColor.surface, side: const BorderSide(color: AppColor.border),
                   );
                 }),
@@ -136,20 +176,20 @@ class AddHistoryPage extends StatelessWidget {
           Row(children: [
             const Text('Total', style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
             const Spacer(),
-            Obx(() => Text(AppFormat.currency(cAdd.total.toString()),
+            Obx(() => Text(AppFormat.currency(c.total),
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColor.accent))),
           ]),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity, height: 52,
             child: ElevatedButton(
-              onPressed: cAdd.items.isEmpty ? null : () => _submit(context),
+              onPressed: () { if (c.items.isNotEmpty) _submit(); },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColor.primary, foregroundColor: Colors.white, elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              child: const Text('Save Entry'),
+              child: Text(_isEditing ? 'Save Changes' : 'Save Entry'),
             ),
           ),
         ],

@@ -25,21 +25,6 @@ class SourceStudent {
     }
   }
 
-  /// Fetch a student by their NIM.
-  static Future<Student?> getByNim(String nim) async {
-    try {
-      final resp = await _client
-          .from('v_student_summary')
-          .select()
-          .eq('nim', nim)
-          .maybeSingle();
-      if (resp == null) return null;
-      return Student.fromViewJson(resp);
-    } catch (_) {
-      return null;
-    }
-  }
-
   /// List all enrollments for a student (with course + grade + lecturer).
   static Future<List<EnrolledCourse>> getEnrollments(String studentId) async {
     try {
@@ -104,27 +89,6 @@ class SourceStudent {
           .toList();
     } catch (_) {
       return [];
-    }
-  }
-
-  /// Attendance summary (counts by status) for a student.
-  static Future<Map<String, int>> getAttendanceSummary(String studentId) async {
-    try {
-      final resp = await _client
-          .from('v_student_summary')
-          .select('total_attended, total_meetings')
-          .eq('student_id', studentId)
-          .maybeSingle();
-      if (resp == null) return {'present': 0, 'absent': 0, 'sick': 0, 'permission': 0, 'total': 0};
-      return {
-        'present': (resp['total_attended'] as num?)?.toInt() ?? 0,
-        'absent': 0,
-        'sick': 0,
-        'permission': 0,
-        'total': (resp['total_meetings'] as num?)?.toInt() ?? 0,
-      };
-    } catch (_) {
-      return {'present': 0, 'absent': 0, 'sick': 0, 'permission': 0, 'total': 0};
     }
   }
 }

@@ -12,6 +12,7 @@ class SourceHistory {
   /// ```
   /// {
   ///   'today':     double,
+  ///   'todayId':   String?,   // id of the newest expense today, null if none
   ///   'yesterday': double,
   ///   'week':      [double, ... 7 items, oldest -> today],
   ///   'month':     { 'income': double, 'outcome': double }
@@ -27,14 +28,16 @@ class SourceHistory {
       final lastOfMonth = DateFormat('yyyy-MM-dd')
           .format(DateTime(now.year, now.month + 1, 0));
 
-      // Today expense
+      // Today expense (id retained so the dashboard can link to the entry)
       final todayResp = await _client
           .from('transactions')
-          .select('total')
+          .select('id, total')
           .eq('user_id', idUser)
           .eq('type', 'expense')
-          .eq('date', today);
+          .eq('date', today)
+          .order('created_at', ascending: false);
       final todayTotal = _sum(todayResp);
+      final todayId = todayResp.isEmpty ? null : todayResp.first['id'] as String?;
 
       // Yesterday expense
       final yesterdayResp = await _client
@@ -84,6 +87,7 @@ class SourceHistory {
 
       return {
         'today': todayTotal,
+        'todayId': todayId,
         'yesterday': yesterdayTotal,
         'week': week,
         'month': {'income': income, 'outcome': outcome},
@@ -92,6 +96,7 @@ class SourceHistory {
       // Return empty shape on failure so the UI can render zeros
       return {
         'today': 0.0,
+        'todayId': null,
         'yesterday': 0.0,
         'week': List<double>.filled(7, 0.0),
         'month': {'income': 0.0, 'outcome': 0.0},
@@ -174,20 +179,23 @@ class SourceHistory {
     }
   }
 
-  /// Fetch transactions for a specific date.
-  static Future<List<History>> historySearch(String idUser, String date) async {
+  /// Fetch a single transaction by its id.
+  ///
+  /// Replaces the old `whereDate`/`detail` pair, which both returned "the first
+  /// row for this date" — ambiguous, since `transactions` has no unique
+  /// constraint on (user_id, date, type), so an edit could hit the wrong row.
+  /// RLS (`transactions_select_own`) already scopes this to the caller's rows.
+  static Future<History?> byId(String idHistory) async {
     try {
       final resp = await _client
           .from('transactions')
           .select()
-          .eq('user_id', idUser)
-          .eq('date', date)
-          .order('created_at', ascending: false);
-      return (resp as List)
-          .map((e) => History.fromSupabase(e as Map<String, dynamic>))
-          .toList();
+          .eq('id', idHistory)
+          .maybeSingle();
+      if (resp == null) return null;
+      return History.fromSupabase(resp);
     } catch (_) {
-      return [];
+      return null;
     }
   }
 
@@ -206,44 +214,6 @@ class SourceHistory {
           .toList();
     } catch (_) {
       return [];
-    }
-  }
-
-  /// Fetch first transaction for a given (date, type) — used by detail view.
-  static Future<History?> whereDate(String idUser, String date) async {
-    try {
-      final resp = await _client
-          .from('transactions')
-          .select()
-          .eq('user_id', idUser)
-          .eq('date', date)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      if (resp == null) return null;
-      return History.fromSupabase(resp);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Fetch first transaction for a given (date, type) — alias.
-  static Future<History?> detail(String idUser, String date, String type) async {
-    final dbType = type == 'Pemasukan' ? 'income' : 'expense';
-    try {
-      final resp = await _client
-          .from('transactions')
-          .select()
-          .eq('user_id', idUser)
-          .eq('date', date)
-          .eq('type', dbType)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      if (resp == null) return null;
-      return History.fromSupabase(resp);
-    } catch (_) {
-      return null;
     }
   }
 

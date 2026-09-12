@@ -6,7 +6,6 @@ import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/page/auth/register_page.dart';
 import 'package:cause_money_record/presentation/page/home_page.dart';
-import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);

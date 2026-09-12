@@ -11,6 +11,9 @@ class SupabaseConfig {
   static SupabaseClient get client => Supabase.instance.client;
 
   static String get url => dotenv.env['SUPABASE_URL'] ?? '';
+
+  /// The dashboard still labels this "anon key"; supabase_flutter renamed the
+  /// parameter to `publishableKey`. Same value, so the env var keeps its name.
   static String get anonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
   /// Call once from `main()` before `runApp()`.
@@ -22,7 +25,7 @@ class SupabaseConfig {
         'Copy .env.example to .env and fill in your credentials.',
       );
     }
-    await Supabase.initialize(url: url, anonKey: anonKey);
+    await Supabase.initialize(url: url, publishableKey: anonKey);
   }
 
   /// Returns the current authenticated user, or null if signed out.

@@ -9,8 +9,6 @@ class History {
   final double total;
   final String? notes;
   final List<HistoryItem> items;
-  final String? createdAt;
-  final String? updatedAt;
 
   History({
     this.idHistory,
@@ -20,8 +18,6 @@ class History {
     required this.total,
     this.notes,
     this.items = const [],
-    this.createdAt,
-    this.updatedAt,
   });
 
   factory History.fromSupabase(Map<String, dynamic> json) {
@@ -37,18 +33,8 @@ class History {
           .whereType<Map<String, dynamic>>()
           .map((e) => HistoryItem.fromJson(e))
           .toList(),
-      createdAt: json['created_at']?.toString(),
-      updatedAt: json['updated_at']?.toString(),
     );
   }
-
-  Map<String, dynamic> toSupabaseInsert() => {
-        'type': type == 'Pemasukan' ? 'income' : 'expense',
-        'date': date,
-        'total': total,
-        'notes': notes,
-        'items': items.map((e) => e.toJson()).toList(),
-      };
 }
 
 class HistoryItem {

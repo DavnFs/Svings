@@ -37,17 +37,17 @@ class AppDialog {
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(title, style: const TextStyle(fontSize: 18)),
         content: Text(message, style: const TextStyle(fontSize: 14)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(_, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(cancelText, style: const TextStyle(color: AppColor.textSecondary)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(_, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(confirmText, style: const TextStyle(color: AppColor.danger)),
           ),
         ],

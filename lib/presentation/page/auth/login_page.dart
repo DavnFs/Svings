@@ -79,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
                   const SizedBox(height: 8),
-                  const Text('Sign in to continue tracking',
+                  Text('Sign in to continue tracking',
                     style: TextStyle(color: AppColor.textSecondary, fontSize: 15)),
                   const SizedBox(height: 40),
                   _buildField(
@@ -145,11 +145,11 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 24),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Text("Don't have an account? ",
+                    Text("Don't have an account? ",
                       style: TextStyle(color: AppColor.textSecondary, fontSize: 14)),
                     GestureDetector(
                       onTap: () => Get.to(() => const RegisterPage()),
-                      child: const Text('Register',
+                      child: Text('Register',
                         style: TextStyle(color: AppColor.accent, fontWeight: FontWeight.w600, fontSize: 14)),
                     ),
                   ]),
@@ -175,17 +175,17 @@ class _LoginPageState extends State<LoginPage> {
       obscureText: obscure,
       keyboardType: type,
       validator: validator,
-      style: const TextStyle(color: AppColor.textPrimary, fontSize: 15),
+      style: TextStyle(color: AppColor.textPrimary, fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColor.textSecondary),
+        hintStyle: TextStyle(color: AppColor.textSecondary),
         prefixIcon: Icon(icon, color: AppColor.textSecondary, size: 20),
         filled: true, fillColor: AppColor.card,
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColor.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColor.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColor.accent, width: 1.5)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColor.danger)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.accent, width: 1.5)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.danger)),
       ),
     );
   }

@@ -41,8 +41,8 @@ class _HistoryPageState extends State<HistoryPage> {
         title: const Text('History', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
       body: Obx(() {
-        if (cHistory.loading) return const Center(child: CircularProgressIndicator(color: AppColor.accent));
-        if (cHistory.list.isEmpty) return const Center(child: Text('No entries', style: TextStyle(color: AppColor.textSecondary)));
+        if (cHistory.loading) return Center(child: CircularProgressIndicator(color: AppColor.accent));
+        if (cHistory.list.isEmpty) return Center(child: Text('No entries', style: TextStyle(color: AppColor.textSecondary)));
         return RefreshIndicator(
           color: AppColor.accent,
           onRefresh: () async => _refresh(),
@@ -77,14 +77,14 @@ class _HistoryPageState extends State<HistoryPage> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(AppFormat.date(h.date), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary, fontSize: 14)),
+                        Text(AppFormat.date(h.date), style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary, fontSize: 14)),
                         Text(isIncome ? 'Income' : 'Expense',
                           style: TextStyle(color: isIncome ? AppColor.income : AppColor.outcome, fontSize: 12)),
                       ])),
-                      Text(AppFormat.currency(h.total), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColor.textPrimary, fontSize: 15)),
+                      Text(AppFormat.currency(h.total), style: TextStyle(fontWeight: FontWeight.w700, color: AppColor.textPrimary, fontSize: 15)),
                       const SizedBox(width: 4),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: AppColor.textSecondary, size: 20),
+                        icon: Icon(Icons.delete_outline, color: AppColor.textSecondary, size: 20),
                         onPressed: () => _delete(h.idHistory!),
                       ),
                     ]),

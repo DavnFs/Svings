@@ -86,7 +86,7 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColor.primary, Color(0xFF3949AB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -175,17 +175,17 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
           ),
           const SizedBox(height: 10),
           Text(value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColor.textPrimary),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColor.textPrimary),
             maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColor.textSecondary, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(fontSize: 11, color: AppColor.textSecondary, fontWeight: FontWeight.w500)),
         ]),
       ),
     );
   }
 
   Widget _sectionTitle(String text) {
-    return Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColor.textPrimary));
+    return Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColor.textPrimary));
   }
 
   Widget _coursesSection() {
@@ -217,10 +217,10 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(e.courseName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
+            Text(e.courseName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
             const SizedBox(height: 2),
             Text('${e.courseCode} • ${e.credits} SKS • Kelas ${e.sectionLabel}',
-              style: const TextStyle(fontSize: 11, color: AppColor.textSecondary)),
+              style: TextStyle(fontSize: 11, color: AppColor.textSecondary)),
           ])),
           if (e.letterGrade != null)
             Container(
@@ -241,7 +241,7 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
           Expanded(
             child: Text(
               e.lecturerName,
-              style: const TextStyle(fontSize: 11, color: AppColor.textSecondary, fontStyle: FontStyle.italic),
+              style: TextStyle(fontSize: 11, color: AppColor.textSecondary, fontStyle: FontStyle.italic),
               maxLines: 1, overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -263,7 +263,7 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(children: [
-              const Text('Nilai Akhir', style: TextStyle(fontSize: 11, color: AppColor.textSecondary)),
+              Text('Nilai Akhir', style: TextStyle(fontSize: 11, color: AppColor.textSecondary)),
               const Spacer(),
               Text(
                 '${e.averageScore!.toStringAsFixed(2)}  •  ${e.finalNumeric?.toStringAsFixed(2) ?? '-'} / 4.00',
@@ -289,11 +289,11 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: AppColor.textSecondary)),
+          Text(label, style: TextStyle(fontSize: 10, color: AppColor.textSecondary)),
           const SizedBox(height: 2),
           Text(
             value == null ? '-' : value.toStringAsFixed(1),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
           ),
         ]),
       ),
@@ -345,7 +345,7 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
         border: Border.all(color: AppColor.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(dayLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
+        Text(dayLabel, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
         const SizedBox(height: 10),
         ...schedules.map((s) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -358,21 +358,21 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Column(children: [
-                    Text(s.startTime, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColor.accent)),
-                    Text(s.endTime, style: const TextStyle(fontSize: 10, color: AppColor.textSecondary)),
+                    Text(s.startTime, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColor.accent)),
+                    Text(s.endTime, style: TextStyle(fontSize: 10, color: AppColor.textSecondary)),
                   ]),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s.courseName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
+                  Text(s.courseName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
                   const SizedBox(height: 2),
                   Text('${s.courseCode} • ${s.lecturerName}',
-                    style: const TextStyle(fontSize: 11, color: AppColor.textSecondary)),
+                    style: TextStyle(fontSize: 11, color: AppColor.textSecondary)),
                   const SizedBox(height: 2),
                   Row(children: [
                     Icon(Icons.location_on_outlined, size: 11, color: AppColor.textSecondary),
                     const SizedBox(width: 3),
-                    Text(s.room, style: const TextStyle(fontSize: 11, color: AppColor.textSecondary)),
+                    Text(s.room, style: TextStyle(fontSize: 11, color: AppColor.textSecondary)),
                   ]),
                 ])),
               ]),

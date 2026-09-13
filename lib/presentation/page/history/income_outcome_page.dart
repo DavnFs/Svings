@@ -50,8 +50,8 @@ class _IncomeOutcomePageState extends State<IncomeOutcomePage> {
         title: Text(isIncome ? 'Income' : 'Expense', style: const TextStyle(fontWeight: FontWeight.w600)),
       ),
       body: Obx(() {
-        if (cInOut.loading) return const Center(child: CircularProgressIndicator(color: AppColor.accent));
-        if (cInOut.list.isEmpty) return const Center(child: Text('No entries', style: TextStyle(color: AppColor.textSecondary)));
+        if (cInOut.loading) return Center(child: CircularProgressIndicator(color: AppColor.accent));
+        if (cInOut.list.isEmpty) return Center(child: Text('No entries', style: TextStyle(color: AppColor.textSecondary)));
         return RefreshIndicator(
           color: AppColor.accent,
           onRefresh: () async => _refresh(),
@@ -85,11 +85,11 @@ class _IncomeOutcomePageState extends State<IncomeOutcomePage> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(child: Text(AppFormat.date(h.date),
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary, fontSize: 14))),
+                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary, fontSize: 14))),
                       Text(AppFormat.currency(h.total),
-                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColor.textPrimary, fontSize: 15)),
+                        style: TextStyle(fontWeight: FontWeight.w700, color: AppColor.textPrimary, fontSize: 15)),
                       PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, color: AppColor.textSecondary, size: 20),
+                        icon: Icon(Icons.more_vert, color: AppColor.textSecondary, size: 20),
                         itemBuilder: (_) => const [
                           PopupMenuItem(value: 'update', child: Text('Update')),
                           PopupMenuItem(value: 'delete', child: Text('Delete')),

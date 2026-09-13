@@ -38,7 +38,7 @@ class StateView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 36,
             height: 36,
             child: CircularProgressIndicator(
@@ -80,7 +80,7 @@ class StateView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Gagal memuat data',
               style: TextStyle(
                 fontSize: 16,
@@ -92,7 +92,7 @@ class StateView extends StatelessWidget {
             Text(
               error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColor.textSecondary,
               ),
@@ -145,7 +145,7 @@ class StateView extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               emptyTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: AppColor.textPrimary,
@@ -155,7 +155,7 @@ class StateView extends StatelessWidget {
             Text(
               emptyMessage,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColor.textSecondary,
               ),

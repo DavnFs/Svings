@@ -36,13 +36,15 @@ RoundedRectangleBorder _rounded(double radius) =>
     RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
 
 ThemeData _buildTheme(Brightness brightness) {
-  final base = ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(seedColor: _seed, brightness: brightness),
-  );
+  final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
+  final base = ThemeData(useMaterial3: true, colorScheme: scheme);
 
   return base.copyWith(
-    scaffoldBackgroundColor: AppColor.surface,
+    // Fallback only — every page sets its own Scaffold background from
+    // AppColor.surface. Read from the scheme, not the palette: the palette's
+    // static brightness is not set until the widget tree builds, and both
+    // themes are constructed before that.
+    scaffoldBackgroundColor: scheme.surface,
     textTheme: base.textTheme.copyWith(
       headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
       titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -75,14 +77,18 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
-      // ponytail: pinned to light until the screens stop hardcoding AppColor.
-      // Flipping to ThemeMode.system is the last step of the screen sweep.
-      themeMode: ThemeMode.light,
+      themeMode: ThemeMode.system,
+      // Runs on every rebuild, before the page tree builds, so AppColor reads
+      // the brightness of the theme actually in effect.
+      builder: (context, child) {
+        AppColor.useBrightness(Theme.of(context).brightness);
+        return child ?? const SizedBox.shrink();
+      },
       home: FutureBuilder(
         future: Session.getUser(),
         builder: (context, AsyncSnapshot<User> snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Scaffold(
+            return Scaffold(
               backgroundColor: AppColor.surface,
               body: Center(
                 child: CircularProgressIndicator(color: AppColor.accent),

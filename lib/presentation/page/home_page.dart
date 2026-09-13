@@ -97,8 +97,8 @@ class _HomePageState extends State<HomePage> {
         ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(AppAsset.profile, width: 44, height: 44)),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
-          Obx(() => Text(cUser.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
+          Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
+          Obx(() => Text(cUser.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
         ])),
         Material(
           color: AppColor.card, borderRadius: BorderRadius.circular(12),
@@ -108,7 +108,7 @@ class _HomePageState extends State<HomePage> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(border: Border.all(color: AppColor.border), borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.menu, color: AppColor.textPrimary, size: 22),
+              child: Icon(Icons.menu, color: AppColor.textPrimary, size: 22),
             ),
           ),
         ),
@@ -128,8 +128,8 @@ class _HomePageState extends State<HomePage> {
                 ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.asset(AppAsset.profile, width: 52, height: 52)),
                 const SizedBox(width: 14),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Obx(() => Text(cUser.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
-                  Obx(() => Text(cUser.data.email ?? '', style: const TextStyle(fontSize: 13, color: AppColor.textSecondary))),
+                  Obx(() => Text(cUser.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
+                  Obx(() => Text(cUser.data.email ?? '', style: TextStyle(fontSize: 13, color: AppColor.textSecondary))),
                 ])),
               ]),
               const SizedBox(height: 16),
@@ -138,7 +138,7 @@ class _HomePageState extends State<HomePage> {
                 child: OutlinedButton(
                   onPressed: _signOut,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColor.danger, side: const BorderSide(color: AppColor.border),
+                    foregroundColor: AppColor.danger, side: BorderSide(color: AppColor.border),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
@@ -147,7 +147,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ]),
           ),
-          const Divider(height: 1, color: AppColor.border),
+          Divider(height: 1, color: AppColor.border),
           _drawerItem(Icons.school_outlined, 'Akademik', () {
             Get.to(() => const StudentDashboardPage());
           }),
@@ -181,16 +181,16 @@ class _HomePageState extends State<HomePage> {
         child: Row(children: [
           Icon(icon, color: AppColor.textPrimary, size: 22),
           const SizedBox(width: 14),
-          Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.textPrimary)),
+          Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.textPrimary)),
           const Spacer(),
-          const Icon(Icons.chevron_right, color: AppColor.border, size: 20),
+          Icon(Icons.chevron_right, color: AppColor.textSecondary, size: 20),
         ]),
       ),
     );
   }
 
   Widget _sectionLabel(String text) {
-    return Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textSecondary, letterSpacing: 0.5));
+    return Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textSecondary, letterSpacing: 0.5));
   }
 
   Widget _todayCard(BuildContext context) {
@@ -258,7 +258,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       if (data[i] > 0)
                         Text('${data[i].toInt()}',
-                          style: const TextStyle(fontSize: 9, color: AppColor.textSecondary)),
+                          style: TextStyle(fontSize: 9, color: AppColor.textSecondary)),
                       const SizedBox(height: 4),
                       Container(
                         height: (ratio * 120).clamp(4.0, 120),
@@ -268,7 +268,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(labels[i], style: const TextStyle(fontSize: 10, color: AppColor.textSecondary)),
+                      Text(labels[i], style: TextStyle(fontSize: 10, color: AppColor.textSecondary)),
                     ],
                   ),
                 ),
@@ -310,7 +310,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 Center(child: Text('${cHome.percentIncome}%',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
               ]),
             ),
             const SizedBox(width: 24),
@@ -319,7 +319,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 8),
               _legendItem(AppColor.outcome, 'Expense'),
               const SizedBox(height: 16),
-              Text(cHome.monthPercent, style: const TextStyle(fontSize: 12, color: AppColor.textSecondary, height: 1.4)),
+              Text(cHome.monthPercent, style: TextStyle(fontSize: 12, color: AppColor.textSecondary, height: 1.4)),
             ])),
           ]),
           const SizedBox(height: 16),
@@ -327,10 +327,10 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
             decoration: BoxDecoration(color: AppColor.surface, borderRadius: BorderRadius.circular(10)),
             child: Row(children: [
-              const Text('Difference', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
+              Text('Difference', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
               const Spacer(),
               Text(AppFormat.currency(cHome.differentMonth),
-                style: const TextStyle(color: AppColor.accent, fontSize: 14, fontWeight: FontWeight.w700)),
+                style: TextStyle(color: AppColor.accent, fontSize: 14, fontWeight: FontWeight.w700)),
             ]),
           ),
         ]);
@@ -342,7 +342,7 @@ class _HomePageState extends State<HomePage> {
     return Row(children: [
       Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
       const SizedBox(width: 8),
-      Text(label, style: const TextStyle(fontSize: 13, color: AppColor.textSecondary)),
+      Text(label, style: TextStyle(fontSize: 13, color: AppColor.textSecondary)),
     ]);
   }
 }

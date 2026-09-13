@@ -64,7 +64,7 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
       body: Obx(() {
         final d = cDetail.data;
         if (d == null) {
-          return const Center(
+          return Center(
             child: Text('No data', style: TextStyle(color: AppColor.textSecondary)),
           );
         }
@@ -82,11 +82,11 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Total', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
+                  Text('Total', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
                   const SizedBox(height: 4),
                   Text(
                     AppFormat.currency(d.total),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
                       color: AppColor.textPrimary,
@@ -96,7 +96,7 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
                     const SizedBox(height: 8),
                     Text(
                       d.notes!,
-                      style: const TextStyle(fontSize: 13, color: AppColor.textSecondary),
+                      style: TextStyle(fontSize: 13, color: AppColor.textSecondary),
                     ),
                   ],
                 ],
@@ -106,7 +106,7 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 itemCount: items.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, color: AppColor.border, indent: 16, endIndent: 16),
+                separatorBuilder: (_, __) => Divider(height: 1, color: AppColor.border, indent: 16, endIndent: 16),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return Padding(
@@ -123,7 +123,7 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
                           child: Center(
                             child: Text(
                               '${index + 1}',
-                              style: const TextStyle(color: AppColor.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(color: AppColor.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -131,12 +131,12 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
                         Expanded(
                           child: Text(
                             item.name,
-                            style: const TextStyle(fontSize: 15, color: AppColor.textPrimary),
+                            style: TextStyle(fontSize: 15, color: AppColor.textPrimary),
                           ),
                         ),
                         Text(
                           AppFormat.currency(num.tryParse(item.price) ?? 0),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: AppColor.textPrimary,

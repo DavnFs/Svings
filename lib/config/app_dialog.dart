@@ -44,11 +44,11 @@ class AppDialog {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(cancelText, style: const TextStyle(color: AppColor.textSecondary)),
+            child: Text(cancelText, style: TextStyle(color: AppColor.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(confirmText, style: const TextStyle(color: AppColor.danger)),
+            child: Text(confirmText, style: TextStyle(color: AppColor.danger)),
           ),
         ],
       ),

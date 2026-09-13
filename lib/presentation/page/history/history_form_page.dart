@@ -105,11 +105,11 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                 border: Border.all(color: AppColor.border),
               ),
               child: Row(children: [
-                const Icon(Icons.calendar_today, size: 18, color: AppColor.textSecondary),
+                Icon(Icons.calendar_today, size: 18, color: AppColor.textSecondary),
                 const SizedBox(width: 10),
-                Obx(() => Text(c.date, style: const TextStyle(color: AppColor.textPrimary, fontSize: 14))),
+                Obx(() => Text(c.date, style: TextStyle(color: AppColor.textPrimary, fontSize: 14))),
                 const Spacer(),
-                const Text('Change', style: TextStyle(color: AppColor.accent, fontSize: 13)),
+                Text('Change', style: TextStyle(color: AppColor.accent, fontSize: 13)),
               ]),
             ),
           ),
@@ -142,7 +142,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
               onPressed: _addItem,
               icon: const Icon(Icons.add, size: 18), label: const Text('Add Item'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColor.accent, side: const BorderSide(color: AppColor.border),
+                foregroundColor: AppColor.accent, side: BorderSide(color: AppColor.border),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
@@ -157,7 +157,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
               border: Border.all(color: AppColor.border),
             ),
             child: Obx(() {
-              if (c.items.isEmpty) return const Text('No items added', style: TextStyle(color: AppColor.textSecondary, fontSize: 13));
+              if (c.items.isEmpty) return Text('No items added', style: TextStyle(color: AppColor.textSecondary, fontSize: 13));
               return Wrap(
                 spacing: 8, runSpacing: 8,
                 children: List.generate(c.items.length, (index) {
@@ -166,7 +166,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                     label: Text('${item.name} - Rp${item.price}', style: const TextStyle(fontSize: 12)),
                     deleteIcon: const Icon(Icons.close, size: 16),
                     onDeleted: () => c.deleteItem(index),
-                    backgroundColor: AppColor.surface, side: const BorderSide(color: AppColor.border),
+                    backgroundColor: AppColor.surface, side: BorderSide(color: AppColor.border),
                   );
                 }),
               );
@@ -174,10 +174,10 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
           ),
           const SizedBox(height: 20),
           Row(children: [
-            const Text('Total', style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
+            Text('Total', style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
             const Spacer(),
             Obx(() => Text(AppFormat.currency(c.total),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColor.accent))),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColor.accent))),
           ]),
           const SizedBox(height: 24),
           SizedBox(
@@ -201,20 +201,20 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(color: AppColor.textPrimary, fontSize: 14),
+      style: TextStyle(color: AppColor.textPrimary, fontSize: 14),
       decoration: InputDecoration(
-        hintText: hint, hintStyle: const TextStyle(color: AppColor.textSecondary),
+        hintText: hint, hintStyle: TextStyle(color: AppColor.textSecondary),
         prefixIcon: Icon(icon, size: 18, color: AppColor.textSecondary),
         filled: true, fillColor: AppColor.card,
         contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColor.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColor.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColor.accent)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.accent)),
       ),
     );
   }
 
   Widget _label(String text) {
-    return Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textSecondary));
+    return Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textSecondary));
   }
 }

@@ -1,5 +1,5 @@
 name: cause_money_record
-description: A new Flutter project.
+description: "svings — money tracker with a campus academic dashboard."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -23,9 +23,33 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - asset/
     - .env
+
+# Regenerate the launcher icons from asset/logo.png:
+#   dart run flutter_launcher_icons
+# Writes android/app/src/main/res/mipmap-*/ic_launcher.png and the iOS
+# AppIcon.appiconset. The Android name must stay ic_launcher to match
+# android:icon="@mipmap/ic_launcher" in android/app/src/main/AndroidManifest.xml.
+# No adaptive_icon_* keys: those need a foreground image with ~33% padding,
+# not a full-bleed square.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "asset/logo.png"
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "asset/logo.png"
+  windows:
+    generate: true
+    image_path: "asset/logo.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "asset/logo.png"

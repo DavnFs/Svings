@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cause_money_record/config/app_color.dart';
 
-/// Reusable state widget — handles loading / error / empty / content
-/// in one place. Pass explicit flags; every screen knows which state it is in.
+/// Reusable state widget: handles loading, error, empty, and content
+/// in one place with BitChord-inspired clean aesthetics.
 class StateView extends StatelessWidget {
   final bool loading;
   final String? error;
@@ -20,8 +20,8 @@ class StateView extends StatelessWidget {
     required this.empty,
     required this.child,
     this.onRetry,
-    this.emptyMessage = 'Belum ada data',
-    this.emptyTitle = 'Kosong',
+    this.emptyMessage = 'No transactions recorded yet',
+    this.emptyTitle = 'No Data',
     this.emptyIcon = Icons.inbox_outlined,
   });
 
@@ -35,26 +35,30 @@ class StateView extends StatelessWidget {
 
   Widget _loadingView() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 36,
-            height: 36,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              color: AppColor.accent,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppColor.accent,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Memuat...',
-            style: TextStyle(
-              color: AppColor.textSecondary.withOpacity(0.8),
-              fontSize: 13,
+            const SizedBox(height: 14),
+            Text(
+              'Loading...',
+              style: TextStyle(
+                color: AppColor.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -67,28 +71,28 @@ class StateView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 72,
-              height: 72,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                color: AppColor.danger.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
+                color: AppColor.danger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
                 Icons.cloud_off_outlined,
-                size: 36,
+                size: 30,
                 color: AppColor.danger,
               ),
             ),
             const SizedBox(height: 16),
             Text(
-              'Gagal memuat data',
+              'Failed to load data',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: AppColor.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               error!,
               textAlign: TextAlign.center,
@@ -98,21 +102,22 @@ class StateView extends StatelessWidget {
               ),
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               SizedBox(
-                height: 42,
+                height: 40,
                 child: ElevatedButton.icon(
                   onPressed: onRetry,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColor.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('Coba lagi'),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Try Again', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
@@ -130,19 +135,19 @@ class StateView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 72,
-              height: 72,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                color: AppColor.accent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
+                color: AppColor.accent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
                 emptyIcon,
-                size: 36,
+                size: 30,
                 color: AppColor.accent,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Text(
               emptyTitle,
               style: TextStyle(

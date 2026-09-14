@@ -9,7 +9,7 @@ import 'package:cause_money_record/config/supabase_config.dart';
 import 'package:cause_money_record/data/model/user.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/auth/login_page.dart';
-import 'package:cause_money_record/presentation/page/home_page.dart';
+import 'package:cause_money_record/presentation/page/main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +31,8 @@ const _seed = Color(0xFF6C63FF);
 /// instead of 84 scattered `BorderRadius.circular()` literals.
 const _radiusSmall = 12.0;   // inputs, chips, outlined buttons
 const _radiusButton = 14.0;  // primary action buttons
-const _radiusCard = 16.0;    // cards and panels
-const _radiusSheet = 20.0;   // dialogs and sheets
+const _radiusCard = 18.0;    // cards and inset groups
+const _radiusSheet = 24.0;   // dialogs and sheets
 
 RoundedRectangleBorder _rounded(double radius) =>
     RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
@@ -49,9 +49,10 @@ ThemeData _buildTheme(Brightness brightness, ColorScheme? dynamicScheme) {
     // Ripple needs a visible surface tone to read as a Material layer.
     scaffoldBackgroundColor: scheme.surface,
     textTheme: base.textTheme.copyWith(
-      headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+      headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
       titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
       titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      labelSmall: base.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4, fontSize: 11),
     ),
     cardTheme: CardThemeData(shape: _rounded(_radiusCard)),
     dialogTheme: DialogThemeData(shape: _rounded(_radiusSheet)),
@@ -68,18 +69,11 @@ ThemeData _buildTheme(Brightness brightness, ColorScheme? dynamicScheme) {
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: scheme.surfaceContainer,
-      indicatorColor: scheme.secondaryContainer,
-      elevation: 0,
-      height: 68,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-    ),
   );
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -118,6 +112,7 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  // ignore: deprecated_member_use
   ColorScheme _paletteToScheme(CorePalette core, Brightness brightness) =>
       ColorScheme.fromSeed(
         // The wallpaper's dominant colour seeds the whole scheme — tone 40 of
@@ -163,7 +158,7 @@ class _MyAppState extends State<MyApp> {
           }
           if (snapshot.data != null && snapshot.data!.idUser != null) {
             Get.put(CUser()).setData(snapshot.data!);
-            return const HomePage();
+            return const MainShell();
           }
           return const LoginPage();
         },

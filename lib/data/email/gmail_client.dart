@@ -171,9 +171,7 @@ class GmailClient {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Mapping — pure, so it is tested against fixtures without a network.
-  // ---------------------------------------------------------------------
+  // Pure mapping tested against fixtures without a network.
 
   /// Maps a `messages.get?format=full` response to a [FetchedEmail].
   /// Returns null when the message carries no readable body.

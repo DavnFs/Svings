@@ -43,13 +43,9 @@ class ParsedTransaction {
 /// nothing here should be treated as authoritative. When you have real emails
 /// to hand, add per-sender overrides rather than growing this heuristic.
 ///
-/// Returns null when no Rupiah amount is found — there is nothing to record.
+/// Returns null when no Rupiah amount is found: there is nothing to record.
 class EmailTransactionParser {
   EmailTransactionParser._();
-
-  // ---------------------------------------------------------------------
-  // Amount
-  // ---------------------------------------------------------------------
 
   /// An amount introduced by a transaction word is far more likely to be the
   /// transaction than a trailing "saldo" figure, so try that first.
@@ -86,10 +82,6 @@ class EmailTransactionParser {
 
     return double.tryParse(s);
   }
-
-  // ---------------------------------------------------------------------
-  // Date
-  // ---------------------------------------------------------------------
 
   static final _isoDate = RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})');
   static final _dmyDate = RegExp(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})');
@@ -141,10 +133,6 @@ class EmailTransactionParser {
     return dt;
   }
 
-  // ---------------------------------------------------------------------
-  // Direction
-  // ---------------------------------------------------------------------
-
   static const _incomeWords = [
     'masuk', 'kredit', 'penerimaan', 'menerima', 'top up', 'topup',
     'cashback', 'refund', 'gaji', 'bonus', 'uang diterima',
@@ -174,11 +162,7 @@ class EmailTransactionParser {
     return 'Pengeluaran';
   }
 
-  // ---------------------------------------------------------------------
-  // Entry point
-  // ---------------------------------------------------------------------
-
-  /// [receivedAt] is the email's timestamp — the fallback when the body carries
+  /// [receivedAt] is the email's timestamp: the fallback when the body carries
   /// no parseable date.
   static ParsedTransaction? parse(String body, {DateTime? receivedAt}) {
     if (body.trim().isEmpty) return null;

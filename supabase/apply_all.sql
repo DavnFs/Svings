@@ -30,7 +30,7 @@
 --            lecturers, courses, students, enrollments, grades, attendance).
 --            That was unrelated to this app and has been removed; it is in
 --            git history if ever needed.
--- =====================================================================
+-- ==========d===========================================================
 
 -- ---------------------------------------------------------------------
 -- Extensions

@@ -53,10 +53,7 @@ class AppColor {
   static const _incomeLight = Color(0xFF059669);
   static const _incomeDark = Color(0xFF7EE2A8);
 
-  // ---------------------------------------------------------------------
-  // Scheme-backed roles. Following the scheme is what lets dynamic colour
-  // reach all ~205 call sites without editing any of them.
-  // ---------------------------------------------------------------------
+  // Scheme-backed roles carrying dynamic color across call sites.
 
   static Color get surface => _scheme?.surface ?? (_dark ? _surfaceDark : _surfaceLight);
 

@@ -217,9 +217,6 @@ class SourceHistory {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------------
   static double _sum(List<dynamic> rows) {
     double total = 0;
     for (final r in rows) {

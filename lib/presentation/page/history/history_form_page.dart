@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cause_money_record/config/app_color.dart';
@@ -8,15 +9,14 @@ import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
+import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
+import 'package:cause_money_record/presentation/widget/pressable.dart';
 
 /// Create or edit a transaction. Pass [idHistory] to edit, omit it to create.
-///
-/// Merges the former AddHistoryPage and UpdateHistoryPage, which were the same
-/// form differing only in which SourceHistory method they called.
 class HistoryFormPage extends StatefulWidget {
   final String? idHistory;
 
-  const HistoryFormPage({Key? key, this.idHistory}) : super(key: key);
+  const HistoryFormPage({super.key, this.idHistory});
 
   @override
   State<HistoryFormPage> createState() => _HistoryFormPageState();
@@ -60,136 +60,323 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
           );
     if (!mounted) return;
     if (success) {
-      AppDialog.success(context, _isEditing ? 'Berhasil Update History' : 'Berhasil Tambah History');
-      await Future.delayed(const Duration(seconds: 1));
+      HapticFeedback.mediumImpact();
+      AppDialog.success(context, _isEditing ? 'Transaction updated successfully' : 'Transaction saved successfully');
+      await Future.delayed(const Duration(milliseconds: 700));
       Get.back(result: true);
     } else {
-      AppDialog.error(context, _isEditing ? 'Gagal Update History' : 'Gagal Tambah History');
+      AppDialog.error(context, _isEditing ? 'Failed to update transaction' : 'Failed to save transaction');
     }
   }
 
   Future<void> _pickDate() async {
     final result = await showDatePicker(
-      context: context, initialDate: DateTime.now(),
-      firstDate: DateTime(2022), lastDate: DateTime(DateTime.now().year + 1),
+      context: context,
+      initialDate: DateTime.tryParse(c.date) ?? DateTime.now(),
+      firstDate: DateTime(2022),
+      lastDate: DateTime(DateTime.now().year + 1),
     );
     if (result != null) c.setDate(DateFormat('yyyy-MM-dd').format(result));
   }
 
   void _addItem() {
-    if (_nameController.text.isEmpty || _priceController.text.isEmpty) return;
-    c.addItem(HistoryItem(name: _nameController.text, price: _priceController.text));
+    final name = _nameController.text.trim();
+    final price = _priceController.text.trim();
+    if (name.isEmpty || price.isEmpty) return;
+    HapticFeedback.lightImpact();
+    c.addItem(HistoryItem(name: name, price: price));
     _nameController.clear();
     _priceController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isIncome = c.type == 'Pemasukan';
+
     return Scaffold(
       backgroundColor: AppColor.surface,
-      appBar: AppBar(
-        backgroundColor: AppColor.card, foregroundColor: AppColor.textPrimary, elevation: 0,
-        title: Text(_isEditing ? 'Update Entry' : 'New Entry',
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      ),
+      appBar: GlassAppBar(title: _isEditing ? 'Edit Entry' : 'New Entry'),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
-          _label('Date'), const SizedBox(height: 8),
-          InkWell(
-            onTap: _pickDate,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppColor.card, borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColor.border),
-              ),
-              child: Row(children: [
-                Icon(Icons.calendar_today, size: 18, color: AppColor.textSecondary),
-                const SizedBox(width: 10),
-                Obx(() => Text(c.date, style: TextStyle(color: AppColor.textPrimary, fontSize: 14))),
-                const Spacer(),
-                Text('Change', style: TextStyle(color: AppColor.accent, fontSize: 13)),
-              ]),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _label('Type'), const SizedBox(height: 8),
+          _sectionLabel('Transaction Details'),
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: AppColor.card, borderRadius: BorderRadius.circular(12),
+              color: AppColor.card,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColor.border),
             ),
-            child: Obx(() => DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: c.type, isExpanded: true, dropdownColor: AppColor.card,
-                items: ['Pemasukan', 'Pengeluaran'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (v) => c.setType(v ?? 'Pemasukan'),
-              ),
-            )),
-          ),
-          const SizedBox(height: 20),
-          _label('Item Name'), const SizedBox(height: 8),
-          _buildField(_nameController, 'e.g. Lunch', Icons.shopping_bag_outlined),
-          const SizedBox(height: 16),
-          _label('Price'), const SizedBox(height: 8),
-          _buildField(_priceController, '30000', Icons.payments_outlined, isNumber: true),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity, height: 44,
-            child: OutlinedButton.icon(
-              onPressed: _addItem,
-              icon: const Icon(Icons.add, size: 18), label: const Text('Add Item'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColor.accent, side: BorderSide(color: AppColor.border),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Obx(() {
+                  final isCurrentlyIncome = c.type == 'Pemasukan';
+                  return Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppColor.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColor.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Pressable(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              c.setType('Pemasukan');
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isCurrentlyIncome ? AppColor.income : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_downward_rounded,
+                                    size: 16,
+                                    color: isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Income',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isCurrentlyIncome ? FontWeight.w700 : FontWeight.w500,
+                                      color: isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Pressable(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              c.setType('Pengeluaran');
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: !isCurrentlyIncome ? AppColor.outcome : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_upward_rounded,
+                                    size: 16,
+                                    color: !isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Expense',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: !isCurrentlyIncome ? FontWeight.w700 : FontWeight.w500,
+                                      color: !isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 14),
+                Divider(height: 1, color: AppColor.border),
+                const SizedBox(height: 14),
+                Pressable(
+                  onTap: _pickDate,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 20, color: AppColor.accent),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Date',
+                          style: TextStyle(color: AppColor.textSecondary, fontSize: 14),
+                        ),
+                        const Spacer(),
+                        Obx(
+                          () => Text(
+                            AppFormat.date(c.date),
+                            style: TextStyle(
+                              color: AppColor.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.chevron_right_rounded, size: 18, color: AppColor.textSecondary),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
-          _label('Items'), const SizedBox(height: 12),
+          _sectionLabel('Add Item'),
+          const SizedBox(height: 8),
           Container(
-            width: double.infinity, padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColor.card, borderRadius: BorderRadius.circular(12),
+              color: AppColor.card,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColor.border),
             ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildField(_nameController, 'Item Description (e.g. Lunch)', Icons.edit_note_rounded),
+                const SizedBox(height: 12),
+                _buildField(_priceController, 'Amount (Rp)', Icons.payments_outlined, isNumber: true),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: _addItem,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add to List'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColor.accent,
+                      side: BorderSide(color: AppColor.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _sectionLabel('Recorded Items'),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColor.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColor.border),
+            ),
+            padding: const EdgeInsets.all(16),
             child: Obx(() {
-              if (c.items.isEmpty) return Text('No items added', style: TextStyle(color: AppColor.textSecondary, fontSize: 13));
-              return Wrap(
-                spacing: 8, runSpacing: 8,
-                children: List.generate(c.items.length, (index) {
-                  final item = c.items[index];
-                  return Chip(
-                    label: Text('${item.name} - Rp${item.price}', style: const TextStyle(fontSize: 12)),
-                    deleteIcon: const Icon(Icons.close, size: 16),
-                    onDeleted: () => c.deleteItem(index),
-                    backgroundColor: AppColor.surface, side: BorderSide(color: AppColor.border),
-                  );
-                }),
+              if (c.items.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'No items added yet. Add an item above to continue.',
+                      style: TextStyle(color: AppColor.textSecondary, fontSize: 13),
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: c.items.length,
+                    separatorBuilder: (_, __) => Divider(height: 1, color: AppColor.border),
+                    itemBuilder: (context, index) {
+                      final item = c.items[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: AppColor.surface,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColor.textSecondary),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item.name,
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColor.textPrimary),
+                              ),
+                            ),
+                            Text(
+                              AppFormat.currency(num.tryParse(item.price) ?? 0),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => c.deleteItem(index),
+                              child: Icon(Icons.close_rounded, size: 18, color: AppColor.textSecondary),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  Divider(height: 1, color: AppColor.border),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Amount',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary, fontSize: 15),
+                      ),
+                      Text(
+                        AppFormat.currency(c.total),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: isIncome ? AppColor.income : AppColor.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               );
             }),
           ),
-          const SizedBox(height: 20),
-          Row(children: [
-            Text('Total', style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
-            const Spacer(),
-            Obx(() => Text(AppFormat.currency(c.total),
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColor.accent))),
-          ]),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           SizedBox(
-            width: double.infinity, height: 52,
-            child: ElevatedButton(
-              onPressed: () { if (c.items.isNotEmpty) _submit(); },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColor.primary, foregroundColor: Colors.white, elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            width: double.infinity,
+            height: 52,
+            child: Obx(
+              () => ElevatedButton(
+                onPressed: c.items.isNotEmpty ? _submit : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColor.border,
+                  disabledForegroundColor: AppColor.textSecondary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                child: Text(_isEditing ? 'Save Changes' : 'Save Transaction'),
               ),
-              child: Text(_isEditing ? 'Save Changes' : 'Save Entry'),
             ),
           ),
         ],
@@ -203,10 +390,12 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: TextStyle(color: AppColor.textPrimary, fontSize: 14),
       decoration: InputDecoration(
-        hintText: hint, hintStyle: TextStyle(color: AppColor.textSecondary),
+        hintText: hint,
+        hintStyle: TextStyle(color: AppColor.textSecondary.withValues(alpha: 0.7), fontSize: 14),
         prefixIcon: Icon(icon, size: 18, color: AppColor.textSecondary),
-        filled: true, fillColor: AppColor.card,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        filled: true,
+        fillColor: AppColor.surface,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.border)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.border)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.accent)),
@@ -214,7 +403,15 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     );
   }
 
-  Widget _label(String text) {
-    return Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColor.textSecondary));
+  Widget _sectionLabel(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColor.textSecondary,
+        letterSpacing: 0.5,
+      ),
+    );
   }
 }

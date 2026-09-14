@@ -13,7 +13,11 @@ do $$
 declare
   v_user1_id uuid := '99999999-9999-9999-9999-999999999901';
   v_user2_id uuid := '99999999-9999-9999-9999-999999999902';
-  v_bcrypt   text := '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';  -- "demo1234"
+  -- bcrypt cost 10 of 'demo1234'. Checked with bcryptjs: this hash accepts
+  -- 'demo1234' and rejects 'password', 'demo123', 'demo12345'.
+  -- (The previous constant was the widely-copied example hash and matched none
+  -- of those, so the demo accounts could not be signed into.)
+  v_bcrypt   text := '$2a$10$2f4vxsLXeQqoQ8AuQq91pO6ZHDflPlNddDnOLlYOmt6POkqSuzoZq';
 begin
   -- Delete if previously seeded (so re-running is idempotent)
   delete from auth.users where id in (v_user1_id, v_user2_id);

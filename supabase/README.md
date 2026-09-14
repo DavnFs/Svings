@@ -9,8 +9,7 @@ supabase/
 ├── config.toml              # Supabase CLI config (start/stop/migration settings)
 ├── migrations/              # Versioned SQL migrations (run in lexicographic order)
 │   ├── 20260101000001_init_schema.sql
-│   ├── 20260101000002_seed_reference_data.sql
-│   └── 20260101000003_rls_policies.sql
+│   └── 20260101000002_rls_policies.sql
 └── seed/                    # Idempotent seed data (dummy records for development)
     ├── 01_faculties_programs.sql
     ├── 02_lecturers.sql

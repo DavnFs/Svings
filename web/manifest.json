@@ -1,6 +1,6 @@
 {
-    "name": "cause_money_record",
-    "short_name": "cause_money_record",
+    "name": "svings",
+    "short_name": "svings",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

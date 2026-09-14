@@ -166,7 +166,7 @@ class _HomePageState extends State<HomePage> {
           const Spacer(),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Text('Uangku', style: TextStyle(color: AppColor.textSecondary.withOpacity(0.5), fontSize: 12)),
+            child: Text('svings', style: TextStyle(color: AppColor.textSecondary.withOpacity(0.5), fontSize: 12)),
           ),
         ]),
       ),

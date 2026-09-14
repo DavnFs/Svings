@@ -45,8 +45,10 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: AppColor.surface,
       endDrawer: _drawer(),
-      body: Column(children: [
-        _header(context),
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          _header(context),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refresh, color: AppColor.accent,
@@ -86,12 +88,13 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ]),
-    );
-  }
+    ),
+  );
+}
 
   Widget _header(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 48, 20, 12),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       child: Row(children: [
         ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(AppAsset.profile, width: 44, height: 44)),
         const SizedBox(width: 14),

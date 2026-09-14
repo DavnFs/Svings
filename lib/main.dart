@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:material_color_utilities/material_color_utilities.dart';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/config/supabase_config.dart';
@@ -35,15 +37,16 @@ const _radiusSheet = 20.0;   // dialogs and sheets
 RoundedRectangleBorder _rounded(double radius) =>
     RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
 
-ThemeData _buildTheme(Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
+/// [dynamicScheme] is the wallpaper-derived scheme from `dynamic_color`, present
+/// only on Android 12+. Everywhere else the seed is used, so light and dark
+/// stay a matched pair in both cases.
+ThemeData _buildTheme(Brightness brightness, ColorScheme? dynamicScheme) {
+  final scheme = dynamicScheme ??
+      ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);
 
   return base.copyWith(
-    // Fallback only — every page sets its own Scaffold background from
-    // AppColor.surface. Read from the scheme, not the palette: the palette's
-    // static brightness is not set until the widget tree builds, and both
-    // themes are constructed before that.
+    // Ripple needs a visible surface tone to read as a Material layer.
     scaffoldBackgroundColor: scheme.surface,
     textTheme: base.textTheme.copyWith(
       headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -65,23 +68,86 @@ ThemeData _buildTheme(Brightness brightness) {
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: scheme.surfaceContainer,
+      indicatorColor: scheme.secondaryContainer,
+      elevation: 0,
+      height: 68,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+    ),
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  /// Wallpaper-derived schemes from `dynamic_color`, when the platform supplies
+  /// them (Android 12+). Everywhere else these stay null and the seed is used.
+  ColorScheme? _lightDynamic;
+  ColorScheme? _darkDynamic;
+  bool _dynamicLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDynamic();
+  }
+
+  Future<void> _loadDynamic() async {
+    try {
+      final core = await DynamicColorPlugin.getCorePalette();
+      if (!mounted || core == null) {
+        if (mounted) setState(() => _dynamicLoaded = true);
+        return;
+      }
+      // Build Flutter ColorSchemes from the OS palette. We bypass
+      // DynamicColorBuilder because it is typed against material_ui's
+      // ColorScheme, which conflicts with Flutter's.
+      setState(() {
+        _lightDynamic = _paletteToScheme(core, Brightness.light);
+        _darkDynamic = _paletteToScheme(core, Brightness.dark);
+        _dynamicLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _dynamicLoaded = true);
+    }
+  }
+
+  ColorScheme _paletteToScheme(CorePalette core, Brightness brightness) =>
+      ColorScheme.fromSeed(
+        // The wallpaper's dominant colour seeds the whole scheme — tone 40 of
+        // the primary palette is the standard "primary" surface colour. Dynamic
+        // colour therefore reaches every AppColor read without editing any call
+        // site.
+        seedColor: Color(core.primary.get(40)),
+        brightness: brightness,
+      );
+
+  @override
   Widget build(BuildContext context) {
+    // Wait for the (possibly absent) dynamic palette before painting, so the
+    // first frame already has the right scheme.
+    if (!_dynamicLoaded) {
+      return const MaterialApp(
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
+      theme: _buildTheme(Brightness.light, _lightDynamic),
+      darkTheme: _buildTheme(Brightness.dark, _darkDynamic),
       themeMode: ThemeMode.system,
       // Runs on every rebuild, before the page tree builds, so AppColor reads
-      // the brightness of the theme actually in effect.
+      // the scheme actually in effect — this is what carries dynamic colour to
+      // every call site without editing any of them.
       builder: (context, child) {
-        AppColor.useBrightness(Theme.of(context).brightness);
+        AppColor.useScheme(Theme.of(context).colorScheme);
         return child ?? const SizedBox.shrink();
       },
       home: FutureBuilder(

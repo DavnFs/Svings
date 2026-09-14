@@ -1,35 +1,42 @@
 import 'package:flutter/material.dart';
 
-/// App palette, resolved per brightness.
+/// App palette, resolved from the live [ColorScheme].
 ///
-/// ponytail: these are static getters rather than `Theme.of(context)` lookups.
-/// The screens reference them from ~205 places, many inside private helpers
-/// (`_statTile`, `_chip`, `_label`, `_legendItem`, `_buildField`, ...) that
-/// receive no BuildContext, so a per-site ColorScheme migration would mean
-/// threading context through ~30 builders for an identical result.
+/// ponytail: static getters rather than `Theme.of(context)` lookups. The screens
+/// reference these from ~205 places, many inside private helpers (`_statTile`,
+/// `_chip`, `_label`, `_legendItem`, `_buildField`, ...) that receive no
+/// BuildContext, so a per-site migration would mean threading context through
+/// ~30 builders for an identical result.
+///
+/// [useScheme] is called from the app root on every rebuild, before the page
+/// tree builds, so every read below is correct for the current frame — including
+/// the wallpaper-derived colours `dynamic_color` supplies on Android 12+.
 ///
 /// The ceiling: a subtree that locally overrides the theme would not get
-/// different colors here. Upgrade path: migrate call sites to
+/// different colours here. Upgrade path: migrate call sites to
 /// `Theme.of(context).colorScheme` role by role, starting with the screens that
-/// have a BuildContext in scope.
-///
-/// [useBrightness] is called once from the app root, before the page tree
-/// builds, so every read below is correct for the current frame.
+/// already have a BuildContext in scope.
 class AppColor {
   AppColor._();
 
+  static ColorScheme? _scheme;
   static Brightness _brightness = Brightness.light;
 
   /// Called from `MaterialApp.builder` on every rebuild.
-  static void useBrightness(Brightness brightness) => _brightness = brightness;
+  static void useScheme(ColorScheme scheme) {
+    _scheme = scheme;
+    _brightness = scheme.brightness;
+  }
+
+  /// Drops back to the literal fallbacks. Used by tests.
+  static void useBrightness(Brightness brightness) {
+    _scheme = null;
+    _brightness = brightness;
+  }
 
   static bool get _dark => _brightness == Brightness.dark;
 
-  /// Brand dark. Used as a *fill* behind white text (primary buttons, the
-  /// today card), so it stays dark in both schemes — it is not the MD3
-  /// `primary` role, which is a foreground accent.
-  static const primary = Color(0xFF1A1A2E);
-
+  // Literal fallbacks, used only when no scheme has been supplied yet.
   static const _accentLight = Color(0xFF6C63FF);
   static const _accentDark = Color(0xFFA9A2FF);
   static const _surfaceLight = Color(0xFFF8F9FA);
@@ -46,16 +53,40 @@ class AppColor {
   static const _incomeLight = Color(0xFF059669);
   static const _incomeDark = Color(0xFF7EE2A8);
 
-  static Color get accent => _dark ? _accentDark : _accentLight;
-  static Color get surface => _dark ? _surfaceDark : _surfaceLight;
-  static Color get card => _dark ? _cardDark : Colors.white;
-  static Color get border => _dark ? _borderDark : _borderLight;
-  static Color get textPrimary => _dark ? _textPrimaryDark : _textPrimaryLight;
-  static Color get textSecondary => _dark ? _textSecondaryDark : _textSecondaryLight;
-  static Color get danger => _dark ? _dangerDark : _dangerLight;
+  // ---------------------------------------------------------------------
+  // Scheme-backed roles. Following the scheme is what lets dynamic colour
+  // reach all ~205 call sites without editing any of them.
+  // ---------------------------------------------------------------------
 
-  /// Money-in green and money-out red. Brighter in dark mode, where the light
-  /// values would sit under the 3:1 floor against a dark surface.
+  static Color get surface => _scheme?.surface ?? (_dark ? _surfaceDark : _surfaceLight);
+
+  /// One tonal step above the surface. MD3 conveys elevation with tonal
+  /// surface colour, not shadows.
+  static Color get card => _scheme?.surfaceContainerLow ?? (_dark ? _cardDark : Colors.white);
+
+  static Color get border => _scheme?.outlineVariant ?? (_dark ? _borderDark : _borderLight);
+  static Color get textPrimary => _scheme?.onSurface ?? (_dark ? _textPrimaryDark : _textPrimaryLight);
+  static Color get textSecondary =>
+      _scheme?.onSurfaceVariant ?? (_dark ? _textSecondaryDark : _textSecondaryLight);
+  static Color get danger => _scheme?.error ?? (_dark ? _dangerDark : _dangerLight);
+
+  /// The brand-ish accent: a tonal derivation of the seed, or the wallpaper's
+  /// when dynamic colour is in play.
+  static Color get accent => _scheme?.primary ?? (_dark ? _accentDark : _accentLight);
+
+  /// Fill for a primary action.
+  static Color get primary => _scheme?.primary ?? const Color(0xFF1A1A2E);
+
+  /// Foreground on [primary]. Always use the pair — hardcoding `Colors.white`
+  /// becomes unreadable in dark mode, where `primary` is light.
+  static Color get onPrimary => _scheme?.onPrimary ?? Colors.white;
+
+  /// Money-in green and money-out red.
+  ///
+  /// Deliberately *not* scheme roles. MD3 has no "money in" role, and mapping
+  /// income to `tertiary` would make it wallpaper-derived and possibly red,
+  /// destroying the one colour distinction this app cannot afford to lose. Tuned
+  /// per brightness for contrast instead.
   static Color get income => _dark ? _incomeDark : _incomeLight;
-  static Color get outcome => _dark ? _dangerDark : _dangerLight;
+  static Color get outcome => _scheme?.error ?? (_dark ? _dangerDark : _dangerLight);
 }

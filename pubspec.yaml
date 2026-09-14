@@ -19,6 +19,7 @@ dependencies:
   supabase_flutter: ^2.8.0
   flutter_dotenv: ^5.2.1
   google_sign_in: ^7.2.0
+  dynamic_color: ^2.1.0
 
 dev_dependencies:
   flutter_test:

@@ -7,6 +7,9 @@ plugins {
 android {
     namespace = "com.example.cause_money_record"
     compileSdk = flutter.compileSdkVersion
+    // Note: Flutter's Gradle plugin forces NDK provisioning for app projects
+    // (FlutterPlugin.forceNdkDownload), so omitting this does not avoid the
+    // NDK download. Kept explicit to match the Flutter template.
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

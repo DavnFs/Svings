@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_asset.dart';
@@ -93,28 +94,40 @@ class _HomePageState extends State<HomePage> {
 }
 
   Widget _header(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Row(children: [
-        ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(AppAsset.profile, width: 44, height: 44)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
-          Obx(() => Text(cUser.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
-        ])),
-        Material(
-          color: AppColor.card, borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: () => Scaffold.of(context).openEndDrawer(),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(border: Border.all(color: AppColor.border), borderRadius: BorderRadius.circular(12)),
-              child: Icon(Icons.menu, color: AppColor.textPrimary, size: 22),
+    // Frosted glass: a translucent surface blurred over whatever scrolls
+    // beneath it. BitChord's signature bar treatment.
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          color: AppColor.surface.withOpacity(0.7),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Row(children: [
+            ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(AppAsset.profile, width: 44, height: 44)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
+              Obx(() => Text(cUser.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary))),
+            ])),
+            Semantics(
+              label: 'Buka menu',
+              button: true,
+              child: Material(
+                color: AppColor.card.withOpacity(0.6), borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () => Scaffold.of(context).openEndDrawer(),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(border: Border.all(color: AppColor.border.withOpacity(0.5)), borderRadius: BorderRadius.circular(12)),
+                    child: Icon(Icons.menu, color: AppColor.textPrimary, size: 22),
+                  ),
+                ),
+              ),
             ),
-          ),
+          ]),
         ),
-      ]),
+      ),
     );
   }
 

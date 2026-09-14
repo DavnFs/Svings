@@ -84,6 +84,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       Text(AppFormat.currency(h.total), style: TextStyle(fontWeight: FontWeight.w700, color: AppColor.textPrimary, fontSize: 15)),
                       const SizedBox(width: 4),
                       IconButton(
+                        tooltip: 'Hapus',
                         icon: Icon(Icons.delete_outline, color: AppColor.textSecondary, size: 20),
                         onPressed: () => _delete(h.idHistory!),
                       ),

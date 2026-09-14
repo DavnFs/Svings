@@ -9,28 +9,34 @@
 --   Supabase Dashboard -> SQL Editor -> New query -> paste this whole file -> Run
 --
 -- Safe to re-run? The migrations are idempotent (create table if not exists,
--- create or replace, enum creation guarded by exception handlers). The SEEDS
--- are not: 99_demo_users.sql deletes and recreates the demo users' rows. Only
--- re-run the whole thing against a database whose data you are happy to reset.
+-- create or replace, type creation guarded by exception handlers). The SEED is
+-- not: it deletes and recreates the demo users' rows. Only re-run the whole
+-- thing against a database whose data you are happy to reset.
 -- =====================================================================
 
 
 -- #####################################################################
 -- ## migrations/20260101000001_init_schema.sql
--- ## Schema: enums, tables, indexes, triggers, v_student_summary
+-- ## Schema: types, tables, indexes, triggers
 -- #####################################################################
 
 -- =====================================================================
 -- Migration: 20260101000001_init_schema.sql
--- Purpose : Create the full Uangku + academic tracking schema.
--- Order    : Run first. Defines all tables, types, functions, triggers.
+-- Purpose : Create the svings money-tracker schema.
+-- Order    : Run first. Defines all types, tables, indexes, triggers.
+--
+-- Scope    : money tracking only. An earlier revision of this file also
+--            defined a campus academic domain (faculties, programs,
+--            lecturers, courses, students, enrollments, grades, attendance).
+--            That was unrelated to this app and has been removed; it is in
+--            git history if ever needed.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
 -- Extensions
 -- ---------------------------------------------------------------------
 create extension if not exists "uuid-ossp";
-create extension if not exists "pgcrypto";
+create extension if not exists pgcrypto;
 
 -- ---------------------------------------------------------------------
 -- Enumerated types
@@ -39,28 +45,10 @@ do $$ begin
   create type transaction_type as enum ('income', 'expense');
 exception when duplicate_object then null; end $$;
 
+-- How a transaction got recorded. Lets the UI distinguish entries the user
+-- typed from entries the email sync produced.
 do $$ begin
-  create type academic_status as enum (
-    'active',          -- currently enrolled
-    'on_leave',        -- cuti
-    'probation',       -- peringatan / akademik
-    'graduated',       -- lulus
-    'dropped_out'      -- DO / mengundurkan diri
-  );
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type attendance_status as enum ('present', 'absent', 'permission', 'sick');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type day_of_week as enum (
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
-  );
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type grade_letter as enum ('A', 'B', 'C', 'D', 'E');
+  create type transaction_source as enum ('manual', 'email');
 exception when duplicate_object then null; end $$;
 
 -- ---------------------------------------------------------------------
@@ -123,299 +111,38 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- =====================================================================
--- 2. faculties
+-- 2. raw_emails — fetched bank / e-wallet notification emails
+--
+-- Stored before parsing so that:
+--   * a re-sync is idempotent — (user_id, message_id) is the dedupe key
+--   * the parser can be improved later and re-run over the stored bodies
 -- =====================================================================
-create table if not exists public.faculties (
-  id          uuid primary key default gen_random_uuid(),
-  code        text        not null unique,            -- e.g. 'FK', 'FT', 'FE'
-  name        text        not null,                   -- e.g. 'Fakultas Komputer'
-  description text,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+create table if not exists public.raw_emails (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid        not null references public.profiles(id) on delete cascade,
+  message_id   text        not null,        -- provider's message id (Gmail)
+  thread_id    text,
+  received_at  timestamptz,
+  sender       text,
+  subject      text,
+  body         text        not null,
+  parsed       boolean     not null default false,
+  parse_error  text,                        -- why parsing failed, if it did
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (user_id, message_id)
 );
 
-create index if not exists idx_faculties_code on public.faculties (code);
+create index if not exists idx_raw_emails_user_parsed on public.raw_emails (user_id, parsed);
+create index if not exists idx_raw_emails_received on public.raw_emails (received_at desc);
 
-drop trigger if exists trg_faculties_updated_at on public.faculties;
-create trigger trg_faculties_updated_at
-  before update on public.faculties
+drop trigger if exists trg_raw_emails_updated_at on public.raw_emails;
+create trigger trg_raw_emails_updated_at
+  before update on public.raw_emails
   for each row execute function public.set_updated_at();
 
 -- =====================================================================
--- 3. study_programs — prodi
--- =====================================================================
-create table if not exists public.study_programs (
-  id            uuid primary key default gen_random_uuid(),
-  faculty_id    uuid        not null references public.faculties(id) on delete restrict,
-  code          text        not null unique,           -- e.g. 'IF', 'SI', 'AK'
-  name          text        not null,                  -- e.g. 'Teknik Informatika'
-  degree        text        not null default 'S1',     -- D3, S1, S2
-  accreditation text,                                  -- A / B / C / Unggul
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-
-create index if not exists idx_study_programs_faculty on public.study_programs (faculty_id);
-
-drop trigger if exists trg_study_programs_updated_at on public.study_programs;
-create trigger trg_study_programs_updated_at
-  before update on public.study_programs
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 4. lecturers — dosen
--- =====================================================================
-create table if not exists public.lecturers (
-  id            uuid primary key default gen_random_uuid(),
-  nidn          text        not null unique,           -- Nomor Induk Dosen Nasional
-  full_name     text        not null,                  -- include 'S.Kom., M.Kom.' etc.
-  email         text        unique,
-  phone         text,
-  expertise     text,                                  -- bidang keahlian
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-
-create index if not exists idx_lecturers_nidn on public.lecturers (nidn);
-create index if not exists idx_lecturers_name on public.lecturers (full_name);
-
-drop trigger if exists trg_lecturers_updated_at on public.lecturers;
-create trigger trg_lecturers_updated_at
-  before update on public.lecturers
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 5. courses — mata kuliah
--- =====================================================================
-create table if not exists public.courses (
-  id              uuid primary key default gen_random_uuid(),
-  code            text        not null unique,           -- e.g. 'IF101'
-  name            text        not null,                  -- e.g. 'Algoritma dan Pemrograman'
-  credits         smallint    not null check (credits > 0 and credits <= 8),
-  semester_target smallint    not null check (semester_target between 1 and 14),
-  description     text,
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
-);
-
-create index if not exists idx_courses_code on public.courses (code);
-create index if not exists idx_courses_semester on public.courses (semester_target);
-
-drop trigger if exists trg_courses_updated_at on public.courses;
-create trigger trg_courses_updated_at
-  before update on public.courses
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 6. students — extends profiles with academic info
--- =====================================================================
-create table if not exists public.students (
-  id              uuid primary key default gen_random_uuid(),        -- surrogate PK
-  user_id         uuid        unique references public.profiles(id) on delete set null,
-  nim             text        not null unique,                        -- NIM: e.g. '21010111120001'
-  full_name       text        not null,
-  email           text        not null,
-  gender          text        check (gender in ('M', 'F')),
-  birth_date      date,
-  address         text,
-  phone           text,
-  study_program_id uuid       not null references public.study_programs(id) on delete restrict,
-  cohort_year     smallint    not null check (cohort_year between 2000 and 2100),
-  current_semester smallint   not null default 1 check (current_semester between 1 and 14),
-  gpa             numeric(3,2) not null default 0.00 check (gpa between 0 and 4),
-  total_credits   smallint    not null default 0 check (total_credits >= 0),
-  status          academic_status not null default 'active',
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
-);
-
-create index if not exists idx_students_nim on public.students (nim);
-create index if not exists idx_students_user_id on public.students (user_id);
-create index if not exists idx_students_program on public.students (study_program_id);
-create index if not exists idx_students_status on public.students (status);
-
-drop trigger if exists trg_students_updated_at on public.students;
-create trigger trg_students_updated_at
-  before update on public.students
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 7. class_sections — penawaran mata kuliah per semester
---    (a course offered in a specific semester, taught by a lecturer)
--- =====================================================================
-create table if not exists public.class_sections (
-  id            uuid primary key default gen_random_uuid(),
-  course_id     uuid        not null references public.courses(id) on delete cascade,
-  lecturer_id   uuid        not null references public.lecturers(id) on delete restrict,
-  study_program_id uuid     not null references public.study_programs(id) on delete cascade,
-  semester      smallint    not null check (semester between 1 and 14),
-  academic_year text        not null,                   -- e.g. '2025/2026'
-  section_label text        not null default 'A',       -- kelas A/B/C
-  capacity      smallint    not null default 40 check (capacity > 0),
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now(),
-  unique (course_id, study_program_id, semester, academic_year, section_label)
-);
-
-create index if not exists idx_class_sections_course on public.class_sections (course_id);
-create index if not exists idx_class_sections_lecturer on public.class_sections (lecturer_id);
-create index if not exists idx_class_sections_program_semester
-  on public.class_sections (study_program_id, semester, academic_year);
-
-drop trigger if exists trg_class_sections_updated_at on public.class_sections;
-create trigger trg_class_sections_updated_at
-  before update on public.class_sections
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 8. schedules — when a class_section meets
--- =====================================================================
-create table if not exists public.schedules (
-  id              uuid primary key default gen_random_uuid(),
-  class_section_id uuid       not null references public.class_sections(id) on delete cascade,
-  day             day_of_week not null,
-  start_time      time        not null,
-  end_time        time        not null,
-  room            text        not null,                -- e.g. 'Gedung A - R.301'
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now(),
-  check (end_time > start_time)
-);
-
-create index if not exists idx_schedules_class_section on public.schedules (class_section_id);
-create index if not exists idx_schedules_day on public.schedules (day);
-
-drop trigger if exists trg_schedules_updated_at on public.schedules;
-create trigger trg_schedules_updated_at
-  before update on public.schedules
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 9. enrollments — student ↔ class_section (KRS)
--- =====================================================================
-create table if not exists public.enrollments (
-  id              uuid primary key default gen_random_uuid(),
-  student_id      uuid        not null references public.students(id) on delete cascade,
-  class_section_id uuid       not null references public.class_sections(id) on delete cascade,
-  enrolled_at     timestamptz not null default now(),
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now(),
-  unique (student_id, class_section_id)
-);
-
-create index if not exists idx_enrollments_student on public.enrollments (student_id);
-create index if not exists idx_enrollments_section on public.enrollments (class_section_id);
-
-drop trigger if exists trg_enrollments_updated_at on public.enrollments;
-create trigger trg_enrollments_updated_at
-  before update on public.enrollments
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 10. grades — assignment, UTS, UAS, final, letter
--- =====================================================================
-create table if not exists public.grades (
-  id                 uuid primary key default gen_random_uuid(),
-  enrollment_id      uuid     not null unique references public.enrollments(id) on delete cascade,
-  assignment_score   numeric(5,2) check (assignment_score between 0 and 100),
-  midterm_score      numeric(5,2) check (midterm_score between 0 and 100),     -- UTS
-  final_score        numeric(5,2) check (final_score between 0 and 100),       -- UAS
-  final_numeric      numeric(4,2) check (final_numeric between 0 and 4),       -- nilai akhir (0-4)
-  letter_grade       grade_letter,
-  created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now(),
-  -- Final numeric is computed from components if not supplied
-  check (
-    (assignment_score is null and midterm_score is null and final_score is null)
-    or (final_numeric is not null)
-  )
-);
-
-create index if not exists idx_grades_enrollment on public.grades (enrollment_id);
-create index if not exists idx_grades_letter on public.grades (letter_grade);
-
-drop trigger if exists trg_grades_updated_at on public.grades;
-create trigger trg_grades_updated_at
-  before update on public.grades
-  for each row execute function public.set_updated_at();
-
--- Auto-compute final_numeric + letter_grade from components on insert/update
-create or replace function public.compute_final_grade()
-returns trigger
-language plpgsql
-as $$
-declare
-  a numeric(5,2) := coalesce(new.assignment_score, 0);
-  m numeric(5,2) := coalesce(new.midterm_score, 0);
-  f numeric(5,2) := coalesce(new.final_score, 0);
-  -- Common Indonesian weighting: Tugas 30% + UTS 30% + UAS 40%
-  weighted numeric(5,2);
-begin
-  if new.assignment_score is not null
-     and new.midterm_score is not null
-     and new.final_score is not null
-  then
-    weighted := (a * 0.30) + (m * 0.30) + (f * 0.40);
-
-    new.final_numeric := case
-      when weighted >= 85 then 4.00
-      when weighted >= 80 then 3.75
-      when weighted >= 75 then 3.50
-      when weighted >= 70 then 3.00
-      when weighted >= 65 then 2.50
-      when weighted >= 60 then 2.00
-      when weighted >= 55 then 1.50
-      when weighted >= 40 then 1.00
-      else 0.00
-    end;
-
-    new.letter_grade := case
-      when weighted >= 85 then 'A'
-      when weighted >= 80 then 'A'  -- some unis use A- = 80, A = 85; we use A for both
-      when weighted >= 75 then 'B'
-      when weighted >= 70 then 'B'
-      when weighted >= 65 then 'C'
-      when weighted >= 60 then 'C'
-      when weighted >= 55 then 'D'
-      else 'E'
-    end;
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_grades_compute on public.grades;
-create trigger trg_grades_compute
-  before insert or update on public.grades
-  for each row execute function public.compute_final_grade();
-
--- =====================================================================
--- 11. attendance — rekap kehadiran per enrollment per pertemuan
--- =====================================================================
-create table if not exists public.attendance (
-  id             uuid primary key default gen_random_uuid(),
-  enrollment_id  uuid        not null references public.enrollments(id) on delete cascade,
-  meeting_date   date        not null,
-  meeting_number smallint    not null check (meeting_number > 0),
-  status         attendance_status not null,
-  notes          text,
-  created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now(),
-  unique (enrollment_id, meeting_date)
-);
-
-create index if not exists idx_attendance_enrollment on public.attendance (enrollment_id);
-create index if not exists idx_attendance_date on public.attendance (meeting_date);
-create index if not exists idx_attendance_status on public.attendance (status);
-
-drop trigger if exists trg_attendance_updated_at on public.attendance;
-create trigger trg_attendance_updated_at
-  before update on public.attendance
-  for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 12. transactions — money tracker (Pemasukan / Pengeluaran)
+-- 3. transactions — the money entries
 -- =====================================================================
 create table if not exists public.transactions (
   id           uuid primary key default gen_random_uuid(),
@@ -424,7 +151,10 @@ create table if not exists public.transactions (
   date         date        not null,
   total        numeric(14,2) not null check (total >= 0),
   notes        text,
-  items        jsonb       not null default '[]'::jsonb,  -- [{name, price}]
+  -- [{name, price}] where price is a STRING; see docs/DATABASE.md
+  items        jsonb       not null default '[]'::jsonb,
+  source       transaction_source not null default 'manual',
+  raw_email_id uuid        references public.raw_emails(id) on delete set null,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
@@ -432,44 +162,12 @@ create table if not exists public.transactions (
 create index if not exists idx_transactions_user_date on public.transactions (user_id, date desc);
 create index if not exists idx_transactions_type on public.transactions (type);
 create index if not exists idx_transactions_user_type_date on public.transactions (user_id, type, date);
+create index if not exists idx_transactions_raw_email on public.transactions (raw_email_id);
 
 drop trigger if exists trg_transactions_updated_at on public.transactions;
 create trigger trg_transactions_updated_at
   before update on public.transactions
   for each row execute function public.set_updated_at();
-
--- =====================================================================
--- 13. View: v_student_summary — denormalized summary per student
--- =====================================================================
-create or replace view public.v_student_summary as
-select
-  s.id              as student_id,
-  s.nim,
-  s.full_name,
-  s.email,
-  s.current_semester,
-  s.gpa,
-  s.status,
-  s.cohort_year,
-  sp.id             as program_id,
-  sp.code           as program_code,
-  sp.name           as program_name,
-  f.id              as faculty_id,
-  f.code            as faculty_code,
-  f.name            as faculty_name,
-  (select count(*) from public.enrollments e where e.student_id = s.id) as total_courses,
-  (select count(*) from public.enrollments e
-     join public.grades g on g.enrollment_id = e.id
-     where e.student_id = s.id and g.letter_grade in ('A','B','C')) as courses_passed,
-  (select count(*) from public.attendance a
-     join public.enrollments e on e.id = a.enrollment_id
-     where e.student_id = s.id and a.status = 'present') as total_attended,
-  (select count(*) from public.attendance a
-     join public.enrollments e on e.id = a.enrollment_id
-     where e.student_id = s.id) as total_meetings
-from public.students s
-join public.study_programs sp on sp.id = s.study_program_id
-join public.faculties f on f.id = sp.faculty_id;
 
 -- =====================================================================
 -- Done.
@@ -483,34 +181,10 @@ join public.faculties f on f.id = sp.faculty_id;
 -- =====================================================================
 -- Migration: 20260101000002_rls_policies.sql
 -- Purpose : Enable RLS and define access policies.
+--
+-- Every table here is per-user private. There are no shared/reference tables
+-- any more — the campus reference data they belonged to has been removed.
 -- =====================================================================
-
--- Helper: get the current authenticated user
-create or replace function public.current_user_id()
-returns uuid
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select auth.uid();
-$$;
-
--- Helper: does the current user own a given student record?
-create or replace function public.is_current_student(p_student_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.students s
-    where s.id = p_student_id
-      and s.user_id = auth.uid()
-  );
-$$;
 
 -- ---------------------------------------------------------------------
 -- profiles
@@ -560,681 +234,37 @@ create policy "transactions_delete_own"
   using (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------
--- Reference tables (faculties, programs, lecturers, courses, schedules)
--- Public read-only for all authenticated users.
+-- raw_emails — private to each user
+--
+-- The email body is the most sensitive thing this app stores, so it gets the
+-- same four-policy treatment as transactions rather than anything looser.
 -- ---------------------------------------------------------------------
-alter table public.faculties         enable row level security;
-alter table public.study_programs    enable row level security;
-alter table public.lecturers         enable row level security;
-alter table public.courses           enable row level security;
-alter table public.class_sections    enable row level security;
-alter table public.schedules         enable row level security;
+alter table public.raw_emails enable row level security;
 
-drop policy if exists "ref_read_all_authenticated" on public.faculties;
-create policy "ref_read_all_authenticated"
-  on public.faculties for select to authenticated using (true);
+drop policy if exists "raw_emails_select_own" on public.raw_emails;
+create policy "raw_emails_select_own"
+  on public.raw_emails for select
+  using (user_id = auth.uid());
 
-drop policy if exists "ref_read_all_authenticated" on public.study_programs;
-create policy "ref_read_all_authenticated"
-  on public.study_programs for select to authenticated using (true);
+drop policy if exists "raw_emails_insert_own" on public.raw_emails;
+create policy "raw_emails_insert_own"
+  on public.raw_emails for insert
+  with check (user_id = auth.uid());
 
-drop policy if exists "ref_read_all_authenticated" on public.lecturers;
-create policy "ref_read_all_authenticated"
-  on public.lecturers for select to authenticated using (true);
-
-drop policy if exists "ref_read_all_authenticated" on public.courses;
-create policy "ref_read_all_authenticated"
-  on public.courses for select to authenticated using (true);
-
-drop policy if exists "ref_read_all_authenticated" on public.class_sections;
-create policy "ref_read_all_authenticated"
-  on public.class_sections for select to authenticated using (true);
-
-drop policy if exists "ref_read_all_authenticated" on public.schedules;
-create policy "ref_read_all_authenticated"
-  on public.schedules for select to authenticated using (true);
-
--- ---------------------------------------------------------------------
--- Students — users can read their own student record; everyone authenticated
--- can read the public student roster (for the demo).
--- ---------------------------------------------------------------------
-alter table public.students enable row level security;
-
-drop policy if exists "students_read_authenticated" on public.students;
-create policy "students_read_authenticated"
-  on public.students for select to authenticated using (true);
-
-drop policy if exists "students_update_own" on public.students;
-create policy "students_update_own"
-  on public.students for update
+drop policy if exists "raw_emails_update_own" on public.raw_emails;
+create policy "raw_emails_update_own"
+  on public.raw_emails for update
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- ---------------------------------------------------------------------
--- enrollments / grades / attendance
--- A user can see records linked to their own student record.
--- ---------------------------------------------------------------------
-alter table public.enrollments enable row level security;
-alter table public.grades     enable row level security;
-alter table public.attendance enable row level security;
-
-drop policy if exists "enrollments_read_own" on public.enrollments;
-create policy "enrollments_read_own"
-  on public.enrollments for select
-  using (public.is_current_student(student_id));
-
-drop policy if exists "grades_read_own" on public.grades;
-create policy "grades_read_own"
-  on public.grades for select
-  using (
-    exists (
-      select 1 from public.enrollments e
-      where e.id = grades.enrollment_id
-        and public.is_current_student(e.student_id)
-    )
-  );
-
-drop policy if exists "attendance_read_own" on public.attendance;
-create policy "attendance_read_own"
-  on public.attendance for select
-  using (
-    exists (
-      select 1 from public.enrollments e
-      where e.id = attendance.enrollment_id
-        and public.is_current_student(e.student_id)
-    )
-  );
-
--- For the demo we relax to read-by-all-authenticated so demo accounts can
--- see each other's rosters. Comment out the policies above and keep these
--- open-read policies if you want full public read for the demo:
---
--- create policy "enrollments_read_all"  on public.enrollments  for select to authenticated using (true);
--- create policy "grades_read_all"      on public.grades       for select to authenticated using (true);
--- create policy "attendance_read_all"  on public.attendance   for select to authenticated using (true);
-
--- ---------------------------------------------------------------------
--- v_student_summary view — re-grant select to authenticated
--- ---------------------------------------------------------------------
-grant select on public.v_student_summary to authenticated;
-
--- #####################################################################
--- ## seed/01_faculties_programs.sql
--- ## Reference data: faculties + study programs
--- #####################################################################
-
--- =====================================================================
--- Seed: 01_faculties_programs.sql
--- Purpose: Idempotent reference data for faculties and study programs.
--- =====================================================================
-
-insert into public.faculties (id, code, name, description) values
-  ('11111111-1111-1111-1111-111111111101', 'FKOM', 'Fakultas Ilmu Komputer', 'Fakultas yang menyelenggarakan program studi di bidang komputer, sistem informasi, dan teknologi informasi.'),
-  ('11111111-1111-1111-1111-111111111102', 'FEKON', 'Fakultas Ekonomi dan Bisnis', 'Fakultas yang menyelenggarakan program studi di bidang ekonomi, manajemen, akuntansi, dan kewirausahaan.'),
-  ('11111111-1111-1111-1111-111111111103', 'FT',   'Fakultas Teknik', 'Fakultas yang menyelenggarakan program studi di bidang teknik elektro, mesin, sipil, dan industri.'),
-  ('11111111-1111-1111-1111-111111111104', 'FMIPA','Fakultas Matematika dan Ilmu Pengetahuan Alam', 'Fakultas yang menyelenggarakan program studi di bidang matematika, fisika, kimia, dan statistika.')
-on conflict (id) do nothing;
-
-insert into public.study_programs (id, faculty_id, code, name, degree, accreditation) values
-  -- Fakultas Ilmu Komputer
-  ('22222222-2222-2222-2222-222222222201', '11111111-1111-1111-1111-111111111101', 'IF',  'Teknik Informatika',          'S1', 'Unggul'),
-  ('22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111101', 'SI',  'Sistem Informasi',            'S1', 'Unggul'),
-  ('22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111101', 'TI',  'Teknologi Informasi',         'S1', 'Baik Sekali'),
-
-  -- Fakultas Ekonomi dan Bisnis
-  ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111102', 'MJ',  'Manajemen',                   'S1', 'Unggul'),
-  ('22222222-2222-2222-2222-222222222205', '11111111-1111-1111-1111-111111111102', 'AK',  'Akuntansi',                   'S1', 'Unggul'),
-  ('22222222-2222-2222-2222-222222222206', '11111111-1111-1111-1111-111111111102', 'EK',  'Ilmu Ekonomi',                'S1', 'Baik Sekali'),
-
-  -- Fakultas Teknik
-  ('22222222-2222-2222-2222-222222222207', '11111111-1111-1111-1111-111111111103', 'TE',  'Teknik Elektro',              'S1', 'Unggul'),
-  ('22222222-2222-2222-2222-222222222208', '11111111-1111-1111-1111-111111111103', 'TM',  'Teknik Mesin',                'S1', 'Baik Sekali'),
-
-  -- Fakultas MIPA
-  ('22222222-2222-2222-2222-222222222209', '11111111-1111-1111-1111-111111111104', 'MT',  'Matematika',                  'S1', 'Unggul'),
-  ('22222222-2222-2222-2222-222222222210', '11111111-1111-1111-1111-111111111104', 'ST',  'Statistika',                  'S1', 'Baik Sekali')
-on conflict (id) do nothing;
-
--- #####################################################################
--- ## seed/02_lecturers.sql
--- ## Reference data: lecturers
--- #####################################################################
-
--- =====================================================================
--- Seed: 02_lecturers.sql
--- Purpose: 30 realistic Indonesian lecturers with NIDN and credentials.
--- =====================================================================
-
-insert into public.lecturers (id, nidn, full_name, email, expertise) values
-  -- Fakultas Ilmu Komputer
-  ('33333333-3333-3333-3333-333333333301', '0001017501', 'Dr. Budi Santoso, S.Kom., M.Kom.',          'budi.santoso@uir.ac.id',  'Kecerdasan Buatan'),
-  ('33333333-3333-3333-3333-333333333302', '0002027802', 'Siti Aminah, S.Kom., M.Cs.',                 'siti.aminah@uir.ac.id',   'Sistem Informasi'),
-  ('33333333-3333-3333-3333-333333333303', '0003038103', 'Andi Wijaya, S.T., M.T.',                   'andi.wijaya@uir.ac.id',  'Jaringan Komputer'),
-  ('33333333-3333-3333-3333-333333333304', '0004048204', 'Dewi Lestari, S.Kom., M.Kom.',              'dewi.lestari@uir.ac.id', 'Rekayasa Perangkat Lunak'),
-  ('33333333-3333-3333-3333-333333333305', '0005058005', 'Rudi Hermawan, S.Kom., M.Sc.',              'rudi.hermawan@uir.ac.id','Basis Data'),
-  ('33333333-3333-3333-3333-333333333306', '0006068306', 'Indah Permata, S.Kom., M.Kom.',             'indah.permata@uir.ac.id','Machine Learning'),
-  ('33333333-3333-3333-3333-333333333307', '0007078407', 'Fajar Nugraha, S.T., M.Eng.',               'fajar.nugraha@uir.ac.id','Sistem Operasi'),
-  ('33333333-3333-3333-3333-333333333308', '0008088508', 'Maya Sari, S.Kom., M.T.I.',                 'maya.sari@uir.ac.id',    'Pemrograman Web'),
-  ('33333333-3333-3333-3333-333333333309', '0009098609', 'Hendra Gunawan, S.Kom., M.Kom.',            'hendra.gunawan@uir.ac.id','Data Mining'),
-  ('33333333-3333-3333-3333-333333333310', '0010108710', 'Prof. Dr. Eko Prabowo, M.Cs.',              'eko.prabowo@uir.ac.id',  'Algoritma dan Pemrograman'),
-
-  -- Fakultas Ekonomi dan Bisnis
-  ('33333333-3333-3333-3333-333333333311', '0011117511', 'Dr. Hj. Sumarni, S.E., M.M.',                'sumarni@uir.ac.id',      'Manajemen Keuangan'),
-  ('33333333-3333-3333-3333-333333333312', '0012127812', 'Wahyu Pratama, S.E., M.M.',                 'wahyu.pratama@uir.ac.id','Manajemen Pemasaran'),
-  ('33333333-3333-3333-3333-333333333313', '0013138113', 'Sri Mulyani, S.E., M.Ak.',                  'sri.mulyani@uir.ac.id',  'Akuntansi Keuangan'),
-  ('33333333-3333-3333-3333-333333333314', '0014148214', 'Ahmad Fauzi, S.E., M.M.',                   'ahmad.fauzi@uir.ac.id',  'Manajemen SDM'),
-  ('33333333-3333-3333-3333-333333333315', '0015158315', 'Lina Marlina, S.E., M.Si.',                 'lina.marlina@uir.ac.id', 'Ekonomi Mikro'),
-  ('33333333-3333-3333-3333-333333333316', '0016168416', 'Bambang Suryadi, S.E., M.M.',               'bambang.suryadi@uir.ac.id','Pajak'),
-
-  -- Fakultas Teknik
-  ('33333333-3333-3333-3333-333333333317', '0017178517', 'Dr. Ir. Joko Widodo, M.T.',                 'joko.widodo@uir.ac.id',  'Teknik Elektro'),
-  ('33333333-3333-3333-3333-333333333318', '0018188618', 'Rina Astuti, S.T., M.T.',                   'rina.astuti@uir.ac.id',  'Sistem Tenaga'),
-  ('33333333-3333-3333-3333-333333333319', '0019198719', 'Ir. Hartono, M.T.',                         'hartono@uir.ac.id',      'Teknik Mesin'),
-  ('33333333-3333-3333-3333-333333333320', '0020208820', 'Yusuf Kurniawan, S.T., M.Eng.',             'yusuf.kurniawan@uir.ac.id','Manufaktur'),
-
-  -- Fakultas MIPA
-  ('33333333-3333-3333-3333-333333333321', '0021218921', 'Dr. Rina Susanti, M.Si.',                   'rina.susanti@uir.ac.id', 'Matematika'),
-  ('33333333-3333-3333-3333-333333333322', '0022229022', 'Hadi Sutopo, S.Si., M.Si.',                 'hadi.sutopo@uir.ac.id',  'Statistika'),
-  ('33333333-3333-3333-3333-333333333323', '0023239123', 'Nurul Hidayah, S.Si., M.Pd.',               'nurul.hidayah@uir.ac.id','Fisika'),
-  ('33333333-3333-3333-3333-333333333324', '0024249224', 'Dr. Tono Sukarto, M.Si.',                   'tono.sukarto@uir.ac.id', 'Kimia'),
-
-  -- Tambahan (pengampu mata kuliah dasar & umum)
-  ('33333333-3333-3333-3333-333333333325', '0025259325', 'Dr. Endang Sulistyowati, M.Pd.',             'endang.sulistyowati@uir.ac.id','Bahasa Indonesia'),
-  ('33333333-3333-3333-3333-333333333326', '0026269426', 'Agus Salim, S.Pd., M.Pd.',                  'agus.salim@uir.ac.id',   'Bahasa Inggris'),
-  ('33333333-3333-3333-3333-333333333327', '0027279527', 'Dr. M. Yusuf, M.Ag.',                       'm.yusuf@uir.ac.id',      'Pendidikan Pancasila'),
-  ('33333333-3333-3333-3333-333333333328', '0028289628', 'Dra. Hj. Khadijah, M.Pd.',                  'khadijah@uir.ac.id',     'Pendidikan Kewarganegaraan'),
-  ('33333333-3333-3333-3333-333333333329', '0029299729', 'Drs. Suparman, M.M.',                       'suparman@uir.ac.id',     'Kewirausahaan'),
-  ('33333333-3333-3333-3333-333333333330', '0030309830', 'Ir. Nurcholis, M.M.',                       'nurcholis@uir.ac.id',    'Etika Profesi')
-on conflict (id) do nothing;
-
--- #####################################################################
--- ## seed/03_courses.sql
--- ## Reference data: courses
--- #####################################################################
-
--- =====================================================================
--- Seed: 03_courses.sql
--- Purpose: 30 realistic Indonesian university courses.
--- =====================================================================
-
-insert into public.courses (id, code, name, credits, semester_target, description) values
-  -- Semester 1-2 (dasar)
-  ('44444444-4444-4444-4444-444444444401', 'UNI101', 'Bahasa Indonesia',                   2,  1,  'Bahasa Indonesia untuk perguruan tinggi.'),
-  ('44444444-4444-4444-4444-444444444402', 'UNI102', 'Bahasa Inggris',                     2,  1,  'English for academic purposes.'),
-  ('44444444-4444-4444-4444-444444444403', 'UNI103', 'Pendidikan Pancasila',               2,  1,  'Pancasila dan kewarganegaraan.'),
-  ('44444444-4444-4444-4444-444444444404', 'UNI104', 'Pendidikan Kewarganegaraan',         2,  2,  'Kewarganegaraan dan bela negara.'),
-  ('44444444-4444-4444-4444-444444444405', 'MAT101', 'Kalkulus I',                         3,  1,  'Diferensial, integral, dan aplikasi.'),
-  ('44444444-4444-4444-4444-444444444406', 'MAT102', 'Kalkulus II',                        3,  2,  'Multivariat, deret, dan vektor.'),
-  ('44444444-4444-4444-4444-444444444407', 'MAT201', 'Matematika Diskrit',                 3,  3,  'Logika, himpunan, graf, kombinatorika.'),
-  ('44444444-4444-4444-4444-444444444408', 'MAT202', 'Aljabar Linear',                     3,  2,  'Vektor, matriks, transformasi linear.'),
-  ('44444444-4444-4444-4444-444444444409', 'MAT301', 'Statistika dan Probabilitas',        3,  4,  'Distribusi, uji hipotesis, regresi.'),
-
-  -- Semester 1-4 (ilmu komputer)
-  ('44444444-4444-4444-4444-444444444410', 'IF101',  'Algoritma dan Pemrograman',           4,  1,  'Konsep algoritma dan pemrograman dasar (Pascal/Python).'),
-  ('44444444-4444-4444-4444-444444444411', 'IF102',  'Struktur Data',                       4,  2,  'List, stack, queue, tree, graph.'),
-  ('44444444-4444-4444-4444-444444444412', 'IF201',  'Pemrograman Berorientasi Objek',      4,  3,  'Konsep OOP dengan Java/Python.'),
-  ('44444444-4444-4444-4444-444444444413', 'IF202',  'Basis Data',                          4,  3,  'Relational DB, SQL, normalisasi.'),
-  ('44444444-4444-4444-4444-444444444414', 'IF203',  'Sistem Operasi',                      3,  4,  'Proses, thread, memory, file system.'),
-  ('44444444-4444-4444-4444-444444444415', 'IF204',  'Jaringan Komputer',                   3,  4,  'OSI/TCP-IP, routing, switching.'),
-  ('44444444-4444-4444-4444-444444444416', 'IF301',  'Pemrograman Web',                     4,  4,  'HTML, CSS, JavaScript, framework.'),
-  ('44444444-4444-4444-4444-444444444417', 'IF302',  'Rekayasa Perangkat Lunak',            3,  5,  'SDLC, requirement, design pattern.'),
-  ('44444444-4444-4444-4444-444444444418', 'IF303',  'Kecerdasan Buatan',                   3,  5,  'Search, knowledge, expert system.'),
-  ('44444444-4444-4444-4444-444444444419', 'IF304',  'Machine Learning',                    3,  6,  'Supervised, unsupervised, deep learning.'),
-  ('44444444-4444-4444-4444-444444444420', 'IF305',  'Keamanan Informasi',                  3,  6,  'Kriptografi, security policy, OWASP.'),
-  ('44444444-4444-4444-4444-444444444421', 'IF306',  'Data Mining',                         3,  6,  'Preprocessing, clustering, klasifikasi.'),
-  ('44444444-4444-4444-4444-444444444422', 'IF401',  'Skripsi',                             6,  8,  'Tugas akhir penelitian terapan.'),
-
-  -- Sistem Informasi
-  ('44444444-4444-4444-4444-444444444423', 'SI201',  'Analisis dan Perancangan Sistem',     3,  4,  'Analisis kebutuhan, DFD, ERD.'),
-  ('44444444-4444-4444-4444-444444444424', 'SI301',  'Manajemen Proyek TI',                 3,  5,  'PMBOK, scrum, agile estimation.'),
-
-  -- Ekonomi & Manajemen
-  ('44444444-4444-4444-4444-444444444425', 'EK101',  'Pengantar Ekonomi Mikro',             3,  1,  'Teori konsumen, produsen, pasar.'),
-  ('44444444-4444-4444-4444-444444444426', 'MJ201',  'Manajemen Keuangan',                  3,  3,  'CAPM, capital budgeting, dividend.'),
-  ('44444444-4444-4444-4444-444444444427', 'MJ202',  'Manajemen Pemasaran',                 3,  4,  'Bauran pemasaran, STP, perilaku konsumen.'),
-  ('44444444-4444-4444-4444-444444444428', 'AK201',  'Akuntansi Keuangan Dasar',            3,  2,  'Persamaan dasar akuntansi, jurnal, laporan.'),
-
-  -- Kewirausahaan / Etika (umum)
-  ('44444444-4444-4444-4444-444444444429', 'UNI201', 'Kewirausahaan',                       2,  5,  'Mindset, business model, lean startup.'),
-  ('44444444-4444-4444-4444-444444444430', 'UNI202', 'Etika Profesi',                       2,  6,  'Etika IT, kode etik, tanggung jawab profesional.')
-on conflict (id) do nothing;
-
--- #####################################################################
--- ## seed/04_students.sql
--- ## Demo students
--- #####################################################################
-
--- =====================================================================
--- Seed: 04_students.sql
--- Purpose: 80 realistic Indonesian college students.
---
--- Naming: realistic Indonesian names across Javanese, Sundanese,
---         Bataknese, Minangkabau, Betawi, and other ethnic groups.
--- NIM    : {program_code}{2-digit-cohort}{4-digit-seq}, e.g. IF210001
--- IPK    : realistic distribution (5% cumlaude, 30% very good, etc.)
--- Status : 85% active, 5% on_leave, 5% probation, 5% graduated
--- =====================================================================
-
--- Helper: 80 students
--- We use on conflict (nim) do nothing so this is idempotent.
-
-insert into public.students
-  (id, user_id, nim, full_name, email, gender, birth_date, address, phone,
-   study_program_id, cohort_year, current_semester, gpa, total_credits, status)
-values
-
--- ============= TEKNIK INFORMATIKA (program 22222222-2222-2222-2222-222222222201) =============
-('55555555-5555-5555-5555-555555555501', null, 'IF210001', 'Ahmad Fauzan Ramadhani',          'ahmad.fauzan@student.uir.ac.id',  'M', '2003-03-12', 'Jl. Sudirman No. 45, Pekanbaru, Riau',          '081234567801', '22222222-2222-2222-2222-222222222201', 2021, 8, 3.78, 110, 'active'),
-('55555555-5555-5555-5555-555555555502', null, 'IF210002', 'Putri Maharani',                   'putri.maharani@student.uir.ac.id', 'F', '2003-05-23', 'Jl. Diponegoro No. 12, Bandung, Jawa Barat',     '081234567802', '22222222-2222-2222-2222-222222222201', 2021, 8, 3.92, 112, 'graduated'),
-('55555555-5555-5555-5555-555555555503', null, 'IF210003', 'Reza Aditya Pratama',              'reza.aditya@student.uir.ac.id',   'M', '2002-11-08', 'Jl. Gatot Subroto No. 78, Medan, Sumatera Utara', '081234567803', '22222222-2222-2222-2222-222222222201', 2021, 7, 3.45, 100, 'active'),
-('55555555-5555-5555-5555-555555555504', null, 'IF210004', 'Nabila Aisyah Putri',              'nabila.aisyah@student.uir.ac.id', 'F', '2003-01-30', 'Jl. Asia Afrika No. 22, Jakarta Selatan',        '081234567804', '22222222-2222-2222-2222-222222222201', 2021, 7, 3.60, 102, 'active'),
-('55555555-5555-5555-5555-555555555505', null, 'IF220001', 'Bayu Setiawan',                    'bayu.setiawan@student.uir.ac.id', 'M', '2003-08-15', 'Jl. Ahmad Yani No. 31, Surabaya, Jawa Timur',   '081234567805', '22222222-2222-2222-2222-222222222201', 2022, 6, 3.30, 88,  'active'),
-('55555555-5555-5555-5555-555555555506', null, 'IF220002', 'Citra Kirana Dewi',                'citra.kirana@student.uir.ac.id',  'F', '2004-02-19', 'Jl. Imam Bonjol No. 9, Denpasar, Bali',          '081234567806', '22222222-2222-2222-2222-222222222201', 2022, 6, 3.55, 92,  'active'),
-('55555555-5555-5555-5555-555555555507', null, 'IF220003', 'Dimas Prasetyo',                   'dimas.prasetyo@student.uir.ac.id','M', '2003-07-04', 'Jl. Veteran No. 14, Semarang, Jawa Tengah',      '081234567807', '22222222-2222-2222-2222-222222222201', 2022, 6, 3.20, 86,  'active'),
-('55555555-5555-5555-5555-555555555508', null, 'IF220004', 'Erika Wulandari',                  'erika.wulandari@student.uir.ac.id','F', '2003-12-22','Jl. Pangeran Antasari No. 6, Bandar Lampung',     '081234567808', '22222222-2222-2222-2222-222222222201', 2022, 6, 3.70, 94,  'active'),
-('55555555-5555-5555-5555-555555555509', null, 'IF230001', 'Fadhil Rahmadhan',                 'fadhil.rahmadhan@student.uir.ac.id','M','2004-04-10', 'Jl. Tuanku Tambusai No. 88, Pekanbaru, Riau',     '081234567809', '22222222-2222-2222-2222-222222222201', 2023, 5, 3.40, 78,  'active'),
-('55555555-5555-5555-5555-555555555510', null, 'IF230002', 'Ghita Salsabila',                  'ghita.salsabila@student.uir.ac.id','F','2004-09-27', 'Jl. Cihampelas No. 17, Bandung, Jawa Barat',     '081234567810', '22222222-2222-2222-2222-222222222201', 2023, 5, 3.85, 82,  'active'),
-('55555555-5555-5555-5555-555555555511', null, 'IF230003', 'Hafiz Anugrah',                    'hafiz.anugrah@student.uir.ac.id', 'M','2004-06-14', 'Jl. Cut Nyak Dien No. 4, Banda Aceh',             '081234567811', '22222222-2222-2222-2222-222222222201', 2023, 5, 3.10, 72,  'probation'),
-('55555555-5555-5555-5555-555555555512', null, 'IF230004', 'Indira Sari',                      'indira.sari@student.uir.ac.id',   'F','2004-11-02', 'Jl. Mayor Ruslan No. 21, Palembang, Sumatera Selatan','081234567812','22222222-2222-2222-2222-222222222201', 2023, 5, 3.50, 80,  'active'),
-('55555555-5555-5555-5555-555555555513', null, 'IF240001', 'Jaka Tirtayasa',                   'jaka.tirtayasa@student.uir.ac.id', 'M','2005-02-28', 'Jl. Pramuka No. 33, Banjarmasin, Kalsel',        '081234567813', '22222222-2222-2222-2222-222222222201', 2024, 4, 3.25, 64,  'active'),
-('55555555-5555-5555-5555-555555555514', null, 'IF240002', 'Kayla Anindita',                   'kayla.anindita@student.uir.ac.id', 'F','2005-08-09', 'Jl. Urip Sumoharjo No. 67, Makassar, Sulsel',    '081234567814', '22222222-2222-2222-2222-222222222201', 2024, 4, 3.65, 68,  'active'),
-('55555555-5555-5555-5555-555555555515', null, 'IF240003', 'Lutfi Hakim',                      'lutfi.hakim@student.uir.ac.id',   'M','2005-05-16', 'Jl. Supratman No. 11, Padang, Sumbar',            '081234567815', '22222222-2222-2222-2222-222222222201', 2024, 4, 2.95, 60,  'active'),
-('55555555-5555-5555-5555-555555555516', null, 'IF240004', 'Maulida Rahma',                    'maulida.rahma@student.uir.ac.id', 'F','2005-10-21', 'Jl. Teuku Umar No. 5, Mataram, NTB',             '081234567816', '22222222-2222-2222-2222-222222222201', 2024, 4, 3.75, 70,  'active'),
-('55555555-5555-5555-5555-555555555517', null, 'IF250001', 'Naufal Akbar',                     'naufal.akbar@student.uir.ac.id',  'M','2006-01-14', 'Jl. WR. Supratman No. 9, Denpasar, Bali',         '081234567817', '22222222-2222-2222-2222-222222222201', 2025, 3, 3.35, 50,  'active'),
-('55555555-5555-5555-5555-555555555518', null, 'IF250002', 'Olivia Tanaya',                    'olivia.tanaya@student.uir.ac.id', 'F','2006-04-03', 'Jl. Kelapa Gading Blok B, Jakarta Utara',         '081234567818', '22222222-2222-2222-2222-222222222201', 2025, 3, 3.80, 52,  'active'),
-('55555555-5555-5555-5555-555555555519', null, 'IF250003', 'Putra Mahardika',                  'putra.mahardika@student.uir.ac.id','M','2005-12-08', 'Jl. P. Mangkubumi No. 18, Yogyakarta',           '081234567819', '22222222-2222-2222-2222-222222222201', 2025, 3, 3.15, 48,  'active'),
-('55555555-5555-5555-5555-555555555520', null, 'IF250004', 'Qori Hidayatullah',                'qori.hidayatullah@student.uir.ac.id','M','2006-07-29', 'Jl. Pahlawan No. 27, Surabaya, Jatim',           '081234567820', '22222222-2222-2222-2222-222222222201', 2025, 3, 2.75, 44,  'on_leave'),
-('55555555-5555-5555-5555-555555555521', null, 'IF260001', 'Rina Mardiana',                    'rina.mardiana@student.uir.ac.id', 'F','2006-09-11', 'Jl. Hasanuddin No. 7, Makassar, Sulsel',         '081234567821', '22222222-2222-2222-2222-222222222201', 2026, 2, 3.50, 30,  'active'),
-('55555555-5555-5555-5555-555555555522', null, 'IF260002', 'Satria Wiguna',                    'satria.wiguna@student.uir.ac.id', 'M','2006-03-25', 'Jl. Setiabudhi No. 88, Bandung, Jabar',           '081234567822', '22222222-2222-2222-2222-222222222201', 2026, 2, 3.20, 28,  'active'),
-('55555555-5555-5555-5555-555555555523', null, 'IF260003', 'Tiara Anggraini',                  'tiara.anggraini@student.uir.ac.id','F','2006-11-17', 'Jl. Veteran No. 9, Manado, Sulut',               '081234567823', '22222222-2222-2222-2222-222222222201', 2026, 2, 3.95, 30,  'active'),
-('55555555-5555-5555-5555-555555555524', null, 'IF260004', 'Umar Bakri',                       'umar.bakri@student.uir.ac.id',    'M','2006-06-30', 'Jl. Slamet Riyadi No. 14, Solo, Jateng',          '081234567824', '22222222-2222-2222-2222-222222222201', 2026, 2, 2.85, 26,  'active'),
-('55555555-5555-5555-5555-555555555525', null, 'IF260005', 'Vina Oktaviani',                   'vina.oktaviani@student.uir.ac.id', 'F','2006-08-12', 'Jl. Perintis Kemerdekaan No. 8, Makassar',         '081234567825', '22222222-2222-2222-2222-222222222201', 2026, 1, 3.70, 18,  'active'),
-
--- ============= SISTEM INFORMASI (program 22222222-2222-2222-2222-222222222202) =============
-('55555555-5555-5555-5555-555555555526', null, 'SI210001', 'Wahyu Hidayat',                    'wahyu.hidayat@student.uir.ac.id', 'M','2002-10-04', 'Jl. P. Diponegoro No. 30, Surabaya',              '081234567826', '22222222-2222-2222-2222-222222222202', 2021, 8, 3.85, 110, 'graduated'),
-('55555555-5555-5555-5555-555555555527', null, 'SI210002', 'Xena Mahesa',                      'xena.mahesa@student.uir.ac.id',   'F','2003-02-15', 'Jl. RA. Kartini No. 23, Jakarta',                 '081234567827', '22222222-2222-2222-2222-222222222202', 2021, 8, 3.70, 108, 'graduated'),
-('55555555-5555-5555-5555-555555555528', null, 'SI220001', 'Yusuf Effendi',                    'yusuf.effendi@student.uir.ac.id', 'M','2003-04-18', 'Jl. Monginsidi No. 12, Makassar',                 '081234567828', '22222222-2222-2222-2222-222222222202', 2022, 7, 3.30, 96,  'active'),
-('55555555-5555-5555-5555-555555555529', null, 'SI220002', 'Zara Amelia',                      'zara.amelia@student.uir.ac.id',   'F','2003-07-30', 'Jl. Basuki Rahmat No. 90, Malang',                '081234567829', '22222222-2222-2222-2222-222222222202', 2022, 6, 3.55, 90,  'active'),
-('55555555-5555-5555-5555-555555555530', null, 'SI230001', 'Aditya Pratama Wirajaya',         'aditya.pw@student.uir.ac.id',     'M','2004-01-22', 'Jl. Hayam Wuruk No. 5, Denpasar',                 '081234567830', '22222222-2222-2222-2222-222222222202', 2023, 5, 3.65, 80,  'active'),
-('55555555-5555-5555-5555-555555555531', null, 'SI230002', 'Bella Safitri',                    'bella.safitri@student.uir.ac.id', 'F','2004-06-08', 'Jl. Sudirman No. 110, Pekanbaru',                 '081234567831', '22222222-2222-2222-2222-222222222202', 2023, 5, 3.40, 76,  'active'),
-('55555555-5555-5555-5555-555555555532', null, 'SI240001', 'Candra Wijaya Kusuma',             'candra.wk@student.uir.ac.id',     'M','2005-03-14', 'Jl. P. Antasari No. 8, Bandar Lampung',           '081234567832', '22222222-2222-2222-2222-222222222202', 2024, 4, 3.20, 64,  'active'),
-('55555555-5555-5555-5555-555555555533', null, 'SI240002', 'Dewi Anggraini',                   'dewi.anggraini@student.uir.ac.id','F','2005-09-26', 'Jl. Dr. Soetomo No. 17, Surabaya',                '081234567833', '22222222-2222-2222-2222-222222222202', 2024, 4, 3.85, 70,  'active'),
-('55555555-5555-5555-5555-555555555534', null, 'SI250001', 'Edo Marcell',                      'edo.marcell@student.uir.ac.id',   'M','2005-11-19', 'Jl. Pattimura No. 22, Ambon',                     '081234567834', '22222222-2222-2222-2222-222222222202', 2025, 3, 3.45, 50,  'active'),
-('55555555-5555-5555-5555-555555555535', null, 'SI250002', 'Fanny Permata',                    'fanny.permata@student.uir.ac.id', 'F','2006-02-04', 'Jl. Cikini Raya No. 45, Jakarta Pusat',          '081234567835', '22222222-2222-2222-2222-222222222202', 2025, 3, 3.65, 52,  'active'),
-('55555555-5555-5555-5555-555555555536', null, 'SI260001', 'Galih Pranata',                    'galih.pranata@student.uir.ac.id', 'M','2006-04-21', 'Jl. Cempaka No. 7, Cirebon',                      '081234567836', '22222222-2222-2222-2222-222222222202', 2026, 2, 3.10, 26,  'active'),
-('55555555-5555-5555-5555-555555555537', null, 'SI260002', 'Hanifah Rahma',                    'hanifah.rahma@student.uir.ac.id', 'F','2006-08-07', 'Jl. Veteran No. 30, Bukittinggi',                 '081234567837', '22222222-2222-2222-2222-222222222202', 2026, 2, 3.80, 30,  'active'),
-('55555555-5555-5555-5555-555555555538', null, 'SI260003', 'Irfan Maulana',                    'irfan.maulana@student.uir.ac.id', 'M','2006-10-15', 'Jl. P. Diponegoro No. 99, Madiun',               '081234567838', '22222222-2222-2222-2222-222222222202', 2026, 1, 3.50, 20,  'active'),
-('55555555-5555-5555-5555-555555555539', null, 'SI260004', 'Jelita Sari',                      'jelita.sari@student.uir.ac.id',   'F','2006-12-23', 'Jl. MT. Haryono No. 33, Balikpapan',              '081234567839', '22222222-2222-2222-2222-222222222202', 2026, 1, 3.25, 18,  'active'),
-('55555555-5555-5555-5555-555555555540', null, 'SI260005', 'Khalid Abdillah',                  'khalid.abdillah@student.uir.ac.id','M','2006-05-11', 'Jl. Wahid Hasyim No. 66, Mataram',                '081234567840', '22222222-2222-2222-2222-222222222202', 2026, 1, 3.95, 20,  'active'),
-
--- ============= TEKNOLOGI INFORMASI (program 22222222-2222-2222-2222-222222222203) =============
-('55555555-5555-5555-5555-555555555541', null, 'TI220001', 'Lia Amelia Putri',                 'lia.amelia@student.uir.ac.id',    'F','2003-05-25', 'Jl. Teuku Umar No. 12, Banda Aceh',               '081234567841', '22222222-2222-2222-2222-222222222203', 2022, 7, 3.45, 96,  'active'),
-('55555555-5555-5555-5555-555555555542', null, 'TI220002', 'Mahesa Adiputra',                  'mahesa.adiputra@student.uir.ac.id','M','2003-09-03', 'Jl. Hang Tuah No. 7, Surabaya',                   '081234567842', '22222222-2222-2222-2222-222222222203', 2022, 6, 3.10, 88,  'active'),
-('55555555-5555-5555-5555-555555555543', null, 'TI230001', 'Nadia Rahmadhani',                 'nadia.rahmadhani@student.uir.ac.id','F','2004-08-19','Jl. Pancasila No. 4, Tegal',                       '081234567843', '22222222-2222-2222-2222-222222222203', 2023, 5, 3.75, 80,  'active'),
-('55555555-5555-5555-5555-555555555544', null, 'TI240001', 'Oki Setiawan',                     'oki.setiawan@student.uir.ac.id',  'M','2004-12-06', 'Jl. Diponegoro No. 8, Magelang',                   '081234567844', '22222222-2222-2222-2222-222222222203', 2024, 4, 3.30, 64,  'active'),
-('55555555-5555-5555-5555-555555555545', null, 'TI240002', 'Putu Ayu Lestari',                 'putu.ayu@student.uir.ac.id',      'F','2005-04-17', 'Jl. Bypass Ngurah Rai No. 22, Denpasar',           '081234567845', '22222222-2222-2222-2222-222222222203', 2024, 4, 3.55, 68,  'active'),
-('55555555-5555-5555-5555-555555555546', null, 'TI250001', 'Qadri Zulfikar',                   'qadri.zulfikar@student.uir.ac.id','M','2005-07-23', 'Jl. Cut Meutia No. 11, Jakarta',                   '081234567846', '22222222-2222-2222-2222-222222222203', 2025, 3, 3.20, 50,  'active'),
-('55555555-5555-5555-5555-555555555547', null, 'TI260001', 'Rangga Wirayudha',                 'rangga.wirayudha@student.uir.ac.id','M','2006-02-09','Jl. Asia Afrika No. 100, Bandung',                 '081234567847', '22222222-2222-2222-2222-222222222203', 2026, 2, 3.50, 30,  'active'),
-('55555555-5555-5555-5555-555555555548', null, 'TI260002', 'Sari Wulandari',                   'sari.wulandari@student.uir.ac.id','F','2006-10-28', 'Jl. Tunjungan No. 50, Surabaya',                   '081234567848', '22222222-2222-2222-2222-222222222203', 2026, 1, 3.85, 20,  'active'),
-
--- ============= MANAJEMEN (program 22222222-2222-2222-2222-222222222204) =============
-('55555555-5555-5555-5555-555555555549', null, 'MJ210001', 'Tio Halomoan',                     'tio.halomoan@student.uir.ac.id',  'M','2002-04-15', 'Jl. P. Siantar No. 9, Pematangsiantar',           '081234567849', '22222222-2222-2222-2222-222222222204', 2021, 8, 3.65, 110, 'graduated'),
-('55555555-5555-5555-5555-555555555550', null, 'MJ220001', 'Umi Kalsum',                       'umi.kalsum@student.uir.ac.id',    'F','2003-06-30', 'Jl. Veteran No. 18, Banjarmasin',                 '081234567850', '22222222-2222-2222-2222-222222222204', 2022, 6, 3.40, 90,  'active'),
-('55555555-5555-5555-5555-555555555551', null, 'MJ220002', 'Vicky Kurniawan',                  'vicky.kurniawan@student.uir.ac.id','M','2003-11-12','Jl. Pelajar Pejuang 45 No. 21, Bandung',           '081234567851', '22222222-2222-2222-2222-222222222204', 2022, 6, 3.20, 88,  'active'),
-('55555555-5555-5555-5555-555555555552', null, 'MJ230001', 'Wahyu Saputra',                    'wahyu.saputra@student.uir.ac.id', 'M','2004-02-22', 'Jl. Sudirman No. 67, Bandar Lampung',              '081234567852', '22222222-2222-2222-2222-222222222204', 2023, 5, 3.55, 80,  'active'),
-('55555555-5555-5555-5555-555555555553', null, 'MJ230002', 'Xenia Karina',                     'xenia.karina@student.uir.ac.id',  'F','2004-07-08', 'Jl. P. Diponegoro No. 88, Pontianak',             '081234567853', '22222222-2222-2222-2222-222222222204', 2023, 5, 3.30, 76,  'active'),
-('55555555-5555-5555-5555-555555555554', null, 'MJ240001', 'Yanto Wibowo',                     'yanto.wibowo@student.uir.ac.id',  'M','2004-10-30', 'Jl. Slamet Riyadi No. 5, Solo',                   '081234567854', '22222222-2222-2222-2222-222222222204', 2024, 4, 3.10, 62,  'active'),
-('55555555-5555-5555-5555-555555555555', null, 'MJ240002', 'Zaskia Adya',                      'zaskia.adya@student.uir.ac.id',   'F','2005-03-19', 'Jl. Hayam Wuruk No. 33, Jakarta',                 '081234567855', '22222222-2222-2222-2222-222222222204', 2024, 4, 3.70, 68,  'active'),
-('55555555-5555-5555-5555-555555555556', null, 'MJ250001', 'Abdul Rochim',                     'abdul.rochim@student.uir.ac.id',  'M','2005-08-12', 'Jl. Dr. Soetomo No. 9, Kediri',                   '081234567856', '22222222-2222-2222-2222-222222222204', 2025, 3, 2.85, 48,  'on_leave'),
-('55555555-5555-5555-5555-555555555557', null, 'MJ250002', 'Bintang Mahesa',                   'bintang.mahesa@student.uir.ac.id','F','2005-11-25', 'Jl. Pahlawan No. 12, Manado',                      '081234567857', '22222222-2222-2222-2222-222222222204', 2025, 3, 3.65, 52,  'active'),
-('55555555-5555-5555-5555-555555555558', null, 'MJ260001', 'Cakra Buana',                      'cakra.buana@student.uir.ac.id',   'M','2006-01-31', 'Jl. Veteran No. 50, Madiun',                      '081234567858', '22222222-2222-2222-2222-222222222204', 2026, 2, 3.40, 28,  'active'),
-('55555555-5555-5555-5555-555555555559', null, 'MJ260002', 'Diah Permatasari',                 'diah.permatasari@student.uir.ac.id','F','2006-05-22','Jl. Merdeka No. 17, Padang',                       '081234567859', '22222222-2222-2222-2222-222222222204', 2026, 2, 3.20, 26,  'active'),
-('55555555-5555-5555-5555-555555555560', null, 'MJ260003', 'Erlangga Pramudya',                'erlangga.p@student.uir.ac.id',    'M','2006-09-14', 'Jl. Gatot Subroto No. 33, Semarang',              '081234567860', '22222222-2222-2222-2222-222222222204', 2026, 1, 3.55, 20,  'active'),
-
--- ============= AKUNTANSI (program 22222222-2222-2222-2222-222222222205) =============
-('55555555-5555-5555-5555-555555555561', null, 'AK210001', 'Fitri Handayani',                  'fitri.handayani@student.uir.ac.id','F','2002-08-08', 'Jl. Sudirman No. 33, Makassar',                   '081234567861', '22222222-2222-2222-2222-222222222205', 2021, 8, 3.75, 110, 'graduated'),
-('55555555-5555-5555-5555-555555555562', null, 'AK220001', 'Gunawan Wibisono',                 'gunawan.w@student.uir.ac.id',     'M','2003-04-26', 'Jl. P. Antasari No. 19, Samarinda',                '081234567862', '22222222-2222-2222-2222-222222222205', 2022, 6, 3.25, 88,  'active'),
-('55555555-5555-5555-5555-555555555563', null, 'AK230001', 'Hesti Wulandari',                  'hesti.wulandari@student.uir.ac.id','F','2004-01-18', 'Jl. A. Yani No. 25, Banjarmasin',                 '081234567863', '22222222-2222-2222-2222-222222222205', 2023, 5, 3.50, 78,  'active'),
-('55555555-5555-5555-5555-555555555564', null, 'AK230002', 'Ikhwan Ramadhan',                  'ikhwan.ramadhan@student.uir.ac.id','M','2004-05-30', 'Jl. T. Nyak Arif No. 14, Banda Aceh',              '081234567864', '22222222-2222-2222-2222-222222222205', 2023, 5, 3.05, 72,  'probation'),
-('55555555-5555-5555-5555-555555555565', null, 'AK240001', 'Jihan Aulia',                      'jihan.aulia@student.uir.ac.id',   'F','2004-10-11', 'Jl. Sisingamangaraja No. 18, Medan',               '081234567865', '22222222-2222-2222-2222-222222222205', 2024, 4, 3.40, 64,  'active'),
-('55555555-5555-5555-5555-555555555566', null, 'AK250001', 'Kurnia Sari',                      'kurnia.sari@student.uir.ac.id',   'F','2005-06-22', 'Jl. Veteran No. 88, Surabaya',                    '081234567866', '22222222-2222-2222-2222-222222222205', 2025, 3, 3.65, 52,  'active'),
-('55555555-5555-5555-5555-555555555567', null, 'AK260001', 'Lutfi Ramadhan',                   'lutfi.ramadhan@student.uir.ac.id','M','2006-02-14', 'Jl. P. Mangkubumi No. 9, Yogyakarta',              '081234567867', '22222222-2222-2222-2222-222222222205', 2026, 2, 3.20, 28,  'active'),
-('55555555-5555-5555-5555-555555555568', null, 'AK260002', 'Mega Lestari',                     'mega.lestari@student.uir.ac.id',  'F','2006-08-29', 'Jl. Asia Afrika No. 22, Jakarta',                 '081234567868', '22222222-2222-2222-2222-222222222205', 2026, 1, 3.80, 20,  'active'),
-
--- ============= MATEMATIKA (program 22222222-2222-2222-2222-222222222209) =============
-('55555555-5555-5555-5555-555555555569', null, 'MT220001', 'Naufal Pradipta',                  'naufal.pradipta@student.uir.ac.id','M','2003-12-04', 'Jl. Cempaka No. 9, Bandung',                       '081234567869', '22222222-2222-2222-2222-222222222209', 2022, 6, 3.65, 92,  'active'),
-('55555555-5555-5555-5555-555555555570', null, 'MT230001', 'Okta Ramadani',                    'okta.ramadani@student.uir.ac.id', 'F','2004-04-19', 'Jl. Imam Bonjol No. 18, Padang',                   '081234567870', '22222222-2222-2222-2222-222222222209', 2023, 5, 3.85, 82,  'active'),
-('55555555-5555-5555-5555-555555555571', null, 'MT240001', 'Pandu Wirajaya',                   'pandu.wirajaya@student.uir.ac.id','M','2004-09-08', 'Jl. Pelajar No. 5, Malang',                        '081234567871', '22222222-2222-2222-2222-222222222209', 2024, 4, 3.25, 62,  'active'),
-('55555555-5555-5555-5555-555555555572', null, 'MT250001', 'Qori Amelia',                      'qori.amelia@student.uir.ac.id',   'F','2005-11-22', 'Jl. P. Diponegoro No. 22, Manado',                 '081234567872', '22222222-2222-2222-2222-222222222209', 2025, 3, 3.45, 50,  'active'),
-('55555555-5555-5555-5555-555555555573', null, 'MT260001', 'Rio Hartono',                      'rio.hartono@student.uir.ac.id',   'M','2006-07-11', 'Jl. Sisingamangaraja No. 4, Pematangsiantar',       '081234567873', '22222222-2222-2222-2222-222222222209', 2026, 1, 3.55, 20,  'active'),
-
--- ============= STATISTIKA (program 22222222-2222-2222-2222-222222222210) =============
-('55555555-5555-5555-5555-555555555574', null, 'ST230001', 'Sari Putri Anggraini',             'sari.putri@student.uir.ac.id',    'F','2004-03-16', 'Jl. Veteran No. 25, Banjarmasin',                 '081234567874', '22222222-2222-2222-2222-222222222210', 2023, 5, 3.55, 80,  'active'),
-('55555555-5555-5555-5555-555555555575', null, 'ST240001', 'Teguh Wijaya',                     'teguh.wijaya@student.uir.ac.id',  'M','2004-08-24', 'Jl. Diponegoro No. 33, Solo',                     '081234567875', '22222222-2222-2222-2222-222222222210', 2024, 4, 3.30, 64,  'active'),
-('55555555-5555-5555-5555-555555555576', null, 'ST250001', 'Umi Salamah',                      'umi.salamah@student.uir.ac.id',   'F','2005-12-30', 'Jl. RA. Kartini No. 14, Madiun',                  '081234567876', '22222222-2222-2222-2222-222222222210', 2025, 3, 3.70, 52,  'active'),
-('55555555-5555-5555-5555-555555555577', null, 'ST260001', 'Verrel Pratama',                   'verrel.pratama@student.uir.ac.id','M','2006-10-09', 'Jl. Tunjungan No. 9, Surabaya',                    '081234567877', '22222222-2222-2222-2222-222222222210', 2026, 1, 3.40, 18,  'active'),
-
--- ============= TEKNIK ELEKTRO (program 22222222-2222-2222-2222-222222222207) =============
-('55555555-5555-5555-5555-555555555578', null, 'TE230001', 'Wahyu Pratama',                    'wahyu.pratama@student.uir.ac.id', 'M','2004-06-26', 'Jl. P. Sudirman No. 17, Pekanbaru',               '081234567878', '22222222-2222-2222-2222-222222222207', 2023, 5, 3.40, 78,  'active'),
-('55555555-5555-5555-5555-555555555579', null, 'TE240001', 'Yunita Sari',                      'yunita.sari@student.uir.ac.id',   'F','2005-01-13', 'Jl. P. Diponegoro No. 5, Surabaya',                '081234567879', '22222222-2222-2222-2222-222222222207', 2024, 4, 3.55, 66,  'active'),
-('55555555-5555-5555-5555-555555555580', null, 'TE250001', 'Zaki Pratama',                     'zaki.pratama@student.uir.ac.id',  'M','2005-09-21', 'Jl. Veteran No. 17, Pontianak',                    '081234567880', '22222222-2222-2222-2222-222222222207', 2025, 3, 3.20, 50,  'active')
-
-on conflict (id) do nothing;
-
--- #####################################################################
--- ## seed/05_schedules_grades_attendance.sql
--- ## Demo class sections, schedules, grades, attendance
--- #####################################################################
-
--- =====================================================================
--- Seed: 05_schedules_grades_attendance.sql
--- Purpose: Generate class_sections, schedules, enrollments, grades,
---          and attendance for all students.
---
--- Strategy: PL/pgSQL DO block that:
---   1. For every (course, study_program, semester, academic_year)
---      combination, creates a class_section with a deterministic lecturer
---      and a weekly schedule.
---   2. For every student at semester N, creates:
---        - enrollments in current semester (N) with grades + attendance
---        - enrollments in previous semesters (1..N-1) with grades only
---   3. Grades are correlated with the student's overall gpa (plus noise).
---   4. Attendance is realistic: 80-95% present.
---
--- Idempotent: re-running drops and recreates all generated rows.
--- =====================================================================
-
--- ---------------------------------------------------------------------
--- 1. Class sections — one per (course, program, semester, year, section)
--- ---------------------------------------------------------------------
-do $$
-declare
-  v_section record;
-  v_cs_id uuid;
-  v_lecturer uuid;
-  v_rooms text[] := array[
-    'Gedung A - R.301', 'Gedung A - R.302', 'Gedung A - R.303',
-    'Gedung B - R.201', 'Gedung B - R.202', 'Gedung B - R.203',
-    'Gedung C - R.101', 'Gedung C - R.102', 'Gedung C - R.103',
-    'Gedung D - R.401', 'Gedung D - R.402',
-    'Lab. Komputer 1', 'Lab. Komputer 2', 'Lab. Komputer 3',
-    'Aula Utama', 'Ruang Seminar'
-  ];
-  v_day_idx int;
-  v_start_hour int;
-  v_duration int;
-  v_start_time time;
-  v_end_time time;
-  v_room text;
-  v_section_label text;
-begin
-  -- Iterate every course
-  for v_section in
-    select
-      c.id   as course_id,
-      c.code as course_code,
-      c.name as course_name,
-      c.credits,
-      c.semester_target,
-      sp.id   as program_id,
-      sp.code as program_code,
-      sp.faculty_id
-    from public.courses c
-    cross join public.study_programs sp
-    where
-      -- match program ↔ course (only IT programs get IF courses, etc.)
-      (
-        (sp.code in ('IF','SI','TI') and c.code like 'IF%' or c.code like 'SI%' or c.code like 'TI%' or c.code like 'UNI%' or c.code like 'MAT%')
-        or (sp.code in ('IF') and c.code like 'IF%')
-        or (sp.code in ('SI') and (c.code like 'IF%' or c.code like 'SI%' or c.code like 'MAT%' or c.code like 'UNI%'))
-        or (sp.code in ('TI') and (c.code like 'IF%' or c.code like 'TI%' or c.code like 'MAT%' or c.code like 'UNI%'))
-        or (sp.code in ('MJ','AK') and (c.code like 'MJ%' or c.code like 'AK%' or c.code like 'EK%' or c.code like 'MAT%' or c.code like 'UNI%'))
-        or (sp.code in ('MT','ST') and (c.code like 'MAT%' or c.code like 'UNI%'))
-        or (sp.code in ('TE') and (c.code like 'MAT%' or c.code like 'IF%' or c.code like 'UNI%'))
-      )
-      and c.semester_target <= 8
-    order by sp.code, c.semester_target, c.code
-  loop
-    -- create one section per (course, program, semester_target, academic_year, label)
-    v_section_label := case when (length(v_section.program_code) + v_section.semester_target) % 2 = 0 then 'A' else 'B' end;
-
-    -- pick a deterministic lecturer by hashing course_id
-    select id into v_lecturer
-    from public.lecturers
-    order by md5(id::text || v_section.course_id::text)
-    limit 1;
-
-    insert into public.class_sections (
-      id, course_id, lecturer_id, study_program_id,
-      semester, academic_year, section_label, capacity
-    ) values (
-      gen_random_uuid(),
-      v_section.course_id,
-      v_lecturer,
-      v_section.program_id,
-      v_section.semester_target,
-      '2025/2026',
-      v_section_label,
-      40
-    )
-    on conflict do nothing
-    returning id into v_cs_id;
-
-    if v_cs_id is null then
-      select id into v_cs_id
-      from public.class_sections
-      where course_id = v_section.course_id
-        and study_program_id = v_section.program_id
-        and semester = v_section.semester_target
-        and academic_year = '2025/2026'
-        and section_label = v_section_label;
-    end if;
-
-    -- weekly schedule: 1-2 meetings per week
-    v_day_idx := (abs(hashtext(v_section.course_id::text || v_section.program_id::text)) % 5);  -- 0=Mon..4=Fri
-    v_start_hour := 8 + (abs(hashtext(v_section.course_id::text)) % 8);  -- 08:00..15:00
-    v_duration := case when v_section.credits >= 3 then 2 else 1 end;
-    v_start_time := make_time(v_start_hour, 0, 0);
-    v_end_time   := make_time(v_start_hour + v_duration, 30, 0);
-    v_room := v_rooms[1 + (abs(hashtext(v_section.course_id::text || v_section.program_id::text)) % array_length(v_rooms, 1))];
-
-    insert into public.schedules (class_section_id, day, start_time, end_time, room)
-    values (
-      v_cs_id,
-      (array['monday','tuesday','wednesday','thursday','friday']::day_of_week[])[v_day_idx + 1],
-      v_start_time,
-      v_end_time,
-      v_room
-    )
-    on conflict do nothing;
-  end loop;
-end $$;
-
--- ---------------------------------------------------------------------
--- 2. Enrollments, Grades, Attendance
--- ---------------------------------------------------------------------
-do $$
-declare
-  v_student record;
-  v_sem int;
-  v_section record;
-  v_enrollment_id uuid;
-  v_gpa_target numeric;
-  v_course_score numeric;
-  v_assignment numeric;
-  v_midterm numeric;
-  v_final numeric;
-  v_final_numeric numeric(4,2);
-  v_letter grade_letter;
-  v_meeting int;
-  v_meeting_date date;
-  v_attendance_pct numeric;
-  v_is_present boolean;
-  v_rand double precision;
-begin
-  for v_student in
-    select id, current_semester, gpa
-    from public.students
-    order by id
-  loop
-    -- ============================================================
-    -- CURRENT semester enrollments (with grades + attendance)
-    -- ============================================================
-    v_gpa_target := v_student.gpa;
-
-    for v_section in
-      select cs.id as section_id
-      from public.class_sections cs
-      join public.courses c on c.id = cs.course_id
-      where cs.study_program_id = (
-              select study_program_id from public.students where id = v_student.id
-            )
-        and cs.semester = v_student.current_semester
-      order by c.semester_target, c.code
-      limit 5
-    loop
-      insert into public.enrollments (student_id, class_section_id)
-      values (v_student.id, v_section.section_id)
-      on conflict do nothing
-      returning id into v_enrollment_id;
-
-      if v_enrollment_id is null then
-        select id into v_enrollment_id
-        from public.enrollments
-        where student_id = v_student.id and class_section_id = v_section.section_id;
-      end if;
-
-      -- Grade generation: noise around the student's GPA mapped to 0-100
-      --   4.00 -> 92
-      --   3.00 -> 78
-      --   2.00 -> 60
-      v_course_score := 50 + (v_gpa_target * 10.5) + ((random() * 20) - 10);
-      v_course_score := greatest(0, least(100, v_course_score));
-
-      -- distribute across components with slight variance
-      v_assignment := greatest(0, least(100, v_course_score + (random() * 10 - 5)));
-      v_midterm    := greatest(0, least(100, v_course_score + (random() * 10 - 5)));
-      v_final      := greatest(0, least(100, v_course_score + (random() * 10 - 5)));
-
-      insert into public.grades (enrollment_id, assignment_score, midterm_score, final_score)
-      values (v_enrollment_id, v_assignment, v_midterm, v_final)
-      on conflict (enrollment_id) do update
-        set assignment_score = excluded.assignment_score,
-            midterm_score    = excluded.midterm_score,
-            final_score      = excluded.final_score;
-
-      -- Attendance for 16 meetings (current semester)
-      v_attendance_pct := 0.80 + (random() * 0.18);  -- 80-98%
-      for v_meeting in 1..16 loop
-        -- First meeting: 2025-09-01 (Monday of week 1 of odd semester)
-        v_meeting_date := date '2025-09-01' + ((v_meeting - 1) * 7);
-
-        v_rand := random();
-        if v_rand < v_attendance_pct then
-          v_is_present := true;
-        elsif v_rand < v_attendance_pct + 0.05 then
-          v_is_present := false;  -- absent
-        elsif v_rand < v_attendance_pct + 0.10 then
-          v_is_present := false;  -- sick
-        else
-          v_is_present := false;  -- permission
-        end if;
-
-        insert into public.attendance (enrollment_id, meeting_date, meeting_number, status, notes)
-        values (
-          v_enrollment_id,
-          v_meeting_date,
-          v_meeting,
-          case
-            when v_is_present then 'present'::attendance_status
-            when v_rand < v_attendance_pct + 0.05 then 'absent'::attendance_status
-            when v_rand < v_attendance_pct + 0.10 then 'sick'::attendance_status
-            else 'permission'::attendance_status
-          end,
-          null
-        )
-        on conflict (enrollment_id, meeting_date) do nothing;
-      end loop;
-    end loop;
-
-    -- ============================================================
-    -- PREVIOUS semester enrollments (grades only, no attendance)
-    -- For students at semester >= 2 only.
-    -- ============================================================
-    if v_student.current_semester >= 2 then
-      for v_sem in 1..(v_student.current_semester - 1) loop
-        for v_section in
-          select cs.id as section_id
-          from public.class_sections cs
-          join public.courses c on c.id = cs.course_id
-          where cs.study_program_id = (
-                  select study_program_id from public.students where id = v_student.id
-                )
-            and cs.semester = v_sem
-          order by c.semester_target, c.code
-          limit 5
-        loop
-          insert into public.enrollments (student_id, class_section_id)
-          values (v_student.id, v_section.section_id)
-          on conflict do nothing
-          returning id into v_enrollment_id;
-
-          if v_enrollment_id is null then
-            select id into v_enrollment_id
-            from public.enrollments
-            where student_id = v_student.id and class_section_id = v_section.section_id;
-          end if;
-
-          v_course_score := 50 + (v_gpa_target * 10.5) + ((random() * 20) - 10);
-          v_course_score := greatest(0, least(100, v_course_score));
-          v_assignment := greatest(0, least(100, v_course_score + (random() * 10 - 5)));
-          v_midterm    := greatest(0, least(100, v_course_score + (random() * 10 - 5)));
-          v_final      := greatest(0, least(100, v_course_score + (random() * 10 - 5)));
-
-          insert into public.grades (enrollment_id, assignment_score, midterm_score, final_score)
-          values (v_enrollment_id, v_assignment, v_midterm, v_final)
-          on conflict (enrollment_id) do update
-            set assignment_score = excluded.assignment_score,
-                midterm_score    = excluded.midterm_score,
-                final_score      = excluded.final_score;
-        end loop;
-      end loop;
-    end if;
-
-  end loop;
-end $$;
-
--- ---------------------------------------------------------------------
--- 3. Refresh the view
--- ---------------------------------------------------------------------
--- (views are computed on the fly; nothing to do)
-
--- Sanity check
-do $$
-declare
-  v_students int;
-  v_class_sections int;
-  v_enrollments int;
-  v_grades int;
-  v_attendance int;
-begin
-  select count(*) into v_students from public.students;
-  select count(*) into v_class_sections from public.class_sections;
-  select count(*) into v_enrollments from public.enrollments;
-  select count(*) into v_grades from public.grades;
-  select count(*) into v_attendance from public.attendance;
-
-  raise notice 'Seed summary:';
-  raise notice '  students       = %', v_students;
-  raise notice '  class_sections = %', v_class_sections;
-  raise notice '  enrollments    = %', v_enrollments;
-  raise notice '  grades         = %', v_grades;
-  raise notice '  attendance     = %', v_attendance;
-end $$;
+drop policy if exists "raw_emails_delete_own" on public.raw_emails;
+create policy "raw_emails_delete_own"
+  on public.raw_emails for delete
+  using (user_id = auth.uid());
 
 -- #####################################################################
 -- ## seed/99_demo_users.sql
--- ## Demo auth users + transactions
+-- ## Demo auth users + sample transactions
 -- #####################################################################
 
 -- =====================================================================
@@ -1294,15 +324,6 @@ begin
       now(), now(),
       '', '', '', ''
     );
-
-  -- 2. Link demo users to existing student records
-  update public.students
-     set user_id = v_user1_id
-   where nim = 'IF210001';   -- Ahmad Fauzan
-
-  update public.students
-     set user_id = v_user2_id
-   where nim = 'IF210002';   -- Putri Maharani
 
   raise notice 'Demo users created: demo@uangku.app / demo2@uangku.app (password: demo1234)';
 end $$;
@@ -1420,18 +441,15 @@ do $$
 declare
   v_users int;
   v_profiles int;
-  v_students_linked int;
   v_tx int;
 begin
   select count(*) into v_users from auth.users where email like 'demo%@uangku.app';
   select count(*) into v_profiles from public.profiles where email like 'demo%@uangku.app';
-  select count(*) into v_students_linked from public.students where user_id is not null;
   select count(*) into v_tx from public.transactions;
 
   raise notice 'Demo seed summary:';
   raise notice '  demo auth users     = %', v_users;
   raise notice '  demo profiles       = %', v_profiles;
-  raise notice '  students with login = %', v_students_linked;
   raise notice '  total transactions  = %', v_tx;
 end $$;
 

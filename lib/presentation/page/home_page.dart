@@ -13,7 +13,6 @@ import 'package:cause_money_record/presentation/page/history/detail_history_page
 import 'package:cause_money_record/presentation/page/history/history_form_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
-import 'package:cause_money_record/presentation/page/student/student_dashboard_page.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 class HomePage extends StatefulWidget {
@@ -148,9 +147,6 @@ class _HomePageState extends State<HomePage> {
             ]),
           ),
           Divider(height: 1, color: AppColor.border),
-          _drawerItem(Icons.school_outlined, 'Akademik', () {
-            Get.to(() => const StudentDashboardPage());
-          }),
           _drawerItem(Icons.add_circle_outline, 'New Entry', () {
             Get.to(() => const HistoryFormPage())?.then((v) { if (v == true) _refresh(); });
           }),

@@ -56,15 +56,6 @@ begin
       '', '', '', ''
     );
 
-  -- 2. Link demo users to existing student records
-  update public.students
-     set user_id = v_user1_id
-   where nim = 'IF210001';   -- Ahmad Fauzan
-
-  update public.students
-     set user_id = v_user2_id
-   where nim = 'IF210002';   -- Putri Maharani
-
   raise notice 'Demo users created: demo@uangku.app / demo2@uangku.app (password: demo1234)';
 end $$;
 
@@ -181,17 +172,14 @@ do $$
 declare
   v_users int;
   v_profiles int;
-  v_students_linked int;
   v_tx int;
 begin
   select count(*) into v_users from auth.users where email like 'demo%@uangku.app';
   select count(*) into v_profiles from public.profiles where email like 'demo%@uangku.app';
-  select count(*) into v_students_linked from public.students where user_id is not null;
   select count(*) into v_tx from public.transactions;
 
   raise notice 'Demo seed summary:';
   raise notice '  demo auth users     = %', v_users;
   raise notice '  demo profiles       = %', v_profiles;
-  raise notice '  students with login = %', v_students_linked;
   raise notice '  total transactions  = %', v_tx;
 end $$;

@@ -8,6 +8,7 @@ import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/config/supabase_config.dart';
 import 'package:cause_money_record/data/model/user.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
+import 'package:cause_money_record/presentation/controller/c_settings.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history.dart';
@@ -27,6 +28,7 @@ class AppBindings extends Bindings {
     Get.put(CIncomeOutcome(), permanent: true);
     Get.put(CDetailHistory(), permanent: true);
     Get.put(CHistoryForm(), permanent: true);
+    Get.put(CSettings(), permanent: true);
   }
 }
 
@@ -36,6 +38,11 @@ void main() async {
 
   // Initialize Supabase before runApp so the first frame can hit the API.
   await SupabaseConfig.initialize();
+
+  // Bindings + settings load before the first frame, so no screen can hit a
+  // "not found" from Get.find and the stored theme applies immediately.
+  AppBindings().dependencies();
+  await Get.find<CSettings>().load();
 
   runApp(const MyApp());
 }
@@ -149,40 +156,85 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    return GetMaterialApp(
-      debugShowCheckedModeBanner: false,
-      initialBinding: AppBindings(),
-      // Wide screens: centered 600px column so the mobile UI never stretches.
-      builder: (context, child) {
-        AppColor.useScheme(Theme.of(context).colorScheme);
-        final body = child ?? const SizedBox.shrink();
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: body,
-          ),
-        );
-      },
-      theme: _buildTheme(Brightness.light, _lightDynamic),
-      darkTheme: _buildTheme(Brightness.dark, _darkDynamic),
-      themeMode: ThemeMode.system,
-      home: FutureBuilder(
-        future: Session.getUser(),
-        builder: (context, AsyncSnapshot<User> snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return Scaffold(
-              backgroundColor: AppColor.surface,
-              body: Center(
-                child: CircularProgressIndicator(color: AppColor.accent),
-              ),
-            );
-          }
-          if (snapshot.data != null && snapshot.data!.idUser != null) {
-            Get.find<CUser>().setData(snapshot.data!);
-            return const MainShell();
-          }
-          return const LoginPage();
+    return _ThemedHost(
+      light: _buildTheme(Brightness.light, _lightDynamic),
+      dark: _buildTheme(Brightness.dark, _darkDynamic),
+    );
+  }
+}
+
+/// Owns the settings-driven ThemeMode. One GetMaterialApp, rebuilt with the
+/// stored mode — theme toggle propagates app-wide with no per-screen state.
+class _ThemedHost extends StatefulWidget {
+  final ThemeData light;
+  final ThemeData dark;
+  const _ThemedHost({required this.light, required this.dark});
+
+  @override
+  State<_ThemedHost> createState() => _ThemedHostState();
+}
+
+class _ThemedHostState extends State<_ThemedHost> {
+  late final CSettings _settings;
+  final _mode = ValueNotifier(ThemeMode.system);
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = Get.find<CSettings>();
+    _mode.value = _settings.themeMode;
+    _settings.addListener(_mirror);
+  }
+
+  void _mirror() {
+    if (_mode.value != _settings.themeMode) _mode.value = _settings.themeMode;
+  }
+
+  @override
+  void dispose() {
+    _settings.removeListener(_mirror);
+    _mode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: _mode,
+      builder: (context, mode, _) => GetMaterialApp(
+        debugShowCheckedModeBanner: false,
+        // Wide screens: centered 600px column so the mobile UI never stretches.
+        builder: (context, child) {
+          AppColor.useScheme(Theme.of(context).colorScheme);
+          final body = child ?? const SizedBox.shrink();
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: body,
+            ),
+          );
         },
+        theme: widget.light,
+        darkTheme: widget.dark,
+        themeMode: mode,
+        home: FutureBuilder(
+          future: Session.getUser(),
+          builder: (context, AsyncSnapshot<User> snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return Scaffold(
+                backgroundColor: AppColor.surface,
+                body: Center(
+                  child: CircularProgressIndicator(color: AppColor.accent),
+                ),
+              );
+            }
+            if (snapshot.data != null && snapshot.data!.idUser != null) {
+              Get.find<CUser>().setData(snapshot.data!);
+              return const MainShell();
+            }
+            return const LoginPage();
+          },
+        ),
       ),
     );
   }

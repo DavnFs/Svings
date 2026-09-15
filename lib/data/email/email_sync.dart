@@ -1,4 +1,5 @@
 import 'package:cause_money_record/data/email/email_transaction_parser.dart';
+import 'package:cause_money_record/data/email/llm_parser.dart';
 import 'package:cause_money_record/data/model/fetched_email.dart';
 import 'package:cause_money_record/data/source/source_email.dart';
 
@@ -69,10 +70,26 @@ class EmailSync {
   final ParseMarker _mark;
   final UnparsedLoader _loadUnparsed;
 
-  EmailSync({EmailStore? store, ParseMarker? mark, UnparsedLoader? loadUnparsed})
-      : _store = store ?? SourceEmail.store,
+  /// LLM fallback for bodies regex rejects. Null (default) = regex only.
+  /// When set, must be [LlmParser.parseWithFallback], which re-runs regex
+  /// first — the fallback order lives in that function, not here.
+  final Future<LlmResult> Function(String body, {DateTime? receivedAt})? _llm;
+
+  /// Called with the count of consecutive 429s so the UI can warn instead of
+  /// silently stalling. Null in tests.
+  final Future<void> Function(int consecutive)? _onRateLimit;
+
+  EmailSync({
+    EmailStore? store,
+    ParseMarker? mark,
+    UnparsedLoader? loadUnparsed,
+    Future<LlmResult> Function(String body, {DateTime? receivedAt})? llm,
+    Future<void> Function(int consecutive)? onRateLimit,
+  })  : _store = store ?? SourceEmail.store,
         _mark = mark ?? SourceEmail.markParsed,
-        _loadUnparsed = loadUnparsed ?? SourceEmail.unparsed;
+        _loadUnparsed = loadUnparsed ?? SourceEmail.unparsed,
+        _llm = llm,
+        _onRateLimit = onRateLimit;
 
   Future<SyncOutcome> sync(List<FetchedEmail> messages) async {
     var stored = 0;
@@ -154,6 +171,7 @@ class EmailSync {
   }
 
   /// Parses one stored message and records the result.
+  /// Order: regex first, LLM fallback only when regex returns null.
   /// Returns `(candidate, wasUnparseable)`.
   Future<(EmailCandidate?, bool)> _parseAndMark(
     String rawEmailId,
@@ -163,6 +181,31 @@ class EmailSync {
     String? subject,
   }) async {
     final parsed = EmailTransactionParser.parse(body, receivedAt: receivedAt);
+
+    if (parsed == null && _llm != null) {
+      final fallback = await _llm!(body, receivedAt: receivedAt);
+      if (fallback.rateLimited) {
+        await _onRateLimit?.call(1);
+        await _tryMark(rawEmailId, 'LLM rate-limited (429)');
+        return (null, true);
+      }
+      if (fallback.transaction != null) {
+        await _tryMark(rawEmailId);
+        return (
+          EmailCandidate(
+            rawEmailId: rawEmailId,
+            sender: sender,
+            subject: subject,
+            transaction: fallback.transaction!,
+          ),
+          false,
+        );
+      }
+      // Fall through to the regex failure note below, tagged as such.
+      await _tryMark(rawEmailId,
+          'no Rupiah amount found in body${fallback.error == null ? '' : ' (${fallback.error})'}');
+      return (null, true);
+    }
 
     if (parsed == null) {
       await _tryMark(rawEmailId, 'no Rupiah amount found in body');

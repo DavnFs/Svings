@@ -54,6 +54,16 @@ class SourceEmail {
     }).eq('id', rawEmailId);
   }
 
+  /// Marks a message ignored (Undo path): the transaction is deleted and this
+  /// flag keeps the next sync from re-parsing the same email. Separate from
+  /// `parsed` so the log can distinguish "handled" from "seen".
+  static Future<void> markIgnored(String rawEmailId) async {
+    await _client.from('raw_emails').update({
+      'parsed': true,
+      'parse_error': 'ignored-by-user',
+    }).eq('id', rawEmailId);
+  }
+
   /// Stored messages that have not been parsed yet, oldest first.
   static Future<List<Map<String, dynamic>>> unparsed({int limit = 50}) async {
     final userId = SupabaseConfig.currentUserId;

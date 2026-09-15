@@ -10,6 +10,13 @@ class History {
   final String? notes;
   final List<HistoryItem> items;
 
+  /// 'manual' | 'email'. Drives the Settings auto-imports log filter.
+  final String source;
+
+  /// raw_emails row this came from, if any. Undo deletes the transaction
+  /// and marks this email ignored so the next sync skips it.
+  final String? rawEmailId;
+
   History({
     this.idHistory,
     this.idUser,
@@ -18,7 +25,11 @@ class History {
     required this.total,
     this.notes,
     this.items = const [],
+    this.source = 'manual',
+    this.rawEmailId,
   });
+
+  bool get isAutoImported => source == 'email';
 
   factory History.fromSupabase(Map<String, dynamic> json) {
     final itemsJson = json['items'] as List? ?? const [];
@@ -33,6 +44,8 @@ class History {
           .whereType<Map<String, dynamic>>()
           .map((e) => HistoryItem.fromJson(e))
           .toList(),
+      source: json['source'] as String? ?? 'manual',
+      rawEmailId: json['raw_email_id']?.toString(),
     );
   }
 }

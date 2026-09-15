@@ -12,6 +12,7 @@ import 'package:cause_money_record/presentation/page/history/history_form_page.d
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
+import 'package:cause_money_record/presentation/page/settings_page.dart';
 import 'package:cause_money_record/presentation/widget/floating_tab_bar.dart'
     show FloatingTabBar, MainTab;
 import 'package:cause_money_record/presentation/widget/frosted_bar.dart';
@@ -151,6 +152,16 @@ class _TopBar extends StatelessWidget {
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
               ),
             )),
+            Semantics(
+              label: 'Settings',
+              button: true,
+              child: IconButton(
+                key: const Key('topbar_settings'),
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                onPressed: () => Get.to(() => const SettingsPage()),
+              ),
+            ),
             Semantics(
               label: 'Sign out',
               button: true,

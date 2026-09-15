@@ -82,7 +82,6 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final reduce = GlassLite.of(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     return Padding(
@@ -93,7 +92,6 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
         child: GlassLite(
           // Fully-rounded cluster like BitChord's RoundedCornerShape(100).
           radius: 100,
-          reduceTransparency: reduce,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: LayoutBuilder(builder: (context, constraints) {
                 final count = MainTab.values.length;

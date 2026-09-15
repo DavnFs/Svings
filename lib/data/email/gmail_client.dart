@@ -71,7 +71,26 @@ class GmailClient {
   }
 
   static Future<void> disconnect() async {
-    await GoogleSignIn.instance.signOut();
+    // Fully revoke server-side: without this the grant survives and the next
+    // connect() silently re-authorizes. Best-effort — local state clears even
+    // if the network call fails.
+    final token = _accessToken;
+    if (token != null) {
+      try {
+        await http.post(
+          Uri.parse('https://oauth2.googleapis.com/revoke'),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'token=${Uri.encodeQueryComponent(token)}',
+        );
+      } catch (_) {
+        // Swallowed: revocation is best-effort, sign-out below still runs.
+      }
+    }
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {
+      // Swallowed: local state clears regardless.
+    }
     _accessToken = null;
     _accountEmail = null;
   }

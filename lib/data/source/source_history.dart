@@ -111,6 +111,8 @@ class SourceHistory {
     required String type,         // 'Pemasukan' or 'Pengeluaran'
     required List<HistoryItem> items,
     String? notes,
+    String source = 'manual',     // 'manual' | 'email'
+    String? rawEmailId,
   }) async {
     final total = items.fold<double>(0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
     try {
@@ -121,6 +123,8 @@ class SourceHistory {
         'total': total,
         'notes': notes,
         'items': items.map((e) => e.toJson()).toList(),
+        'source': source,
+        'raw_email_id': rawEmailId,
       });
       return true;
     } catch (_) {
@@ -159,6 +163,37 @@ class SourceHistory {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Deletes EVERY transaction for a user. Settings → Data → Reset.
+  /// Gated behind a double-confirm destructive dialog at the call site;
+  /// this function itself just executes.
+  static Future<bool> deleteAll(String idUser) async {
+    try {
+      await _client.from('transactions').delete().eq('user_id', idUser);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Transactions created by the email sync, newest first — the Settings
+  /// "Recent auto-imports" log. Manual entries never appear here.
+  static Future<List<History>> autoImported(String idUser, {int limit = 20}) async {
+    try {
+      final resp = await _client
+          .from('transactions')
+          .select()
+          .eq('user_id', idUser)
+          .eq('source', 'email')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return (resp as List)
+          .map((e) => History.fromSupabase(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
     }
   }
 

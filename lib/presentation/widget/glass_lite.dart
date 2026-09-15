@@ -2,7 +2,9 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_color.dart';
+import 'package:cause_money_record/presentation/controller/c_settings.dart';
 
 /// Scoped "liquid glass lite": frosted blur only, no refraction shader.
 ///
@@ -35,13 +37,59 @@ class GlassLite extends StatelessWidget {
 
   /// Reads the platform reduce-transparency setting where exposed. Today that
   /// is iOS (`UIAccessibility.isReduceTransparencyEnabled` via
-  /// MediaQuery.highContrast) — Android has no direct equivalent, so callers
-  /// may also pass [reduceTransparency] explicitly from an app-level toggle.
-  static bool of(BuildContext context) => MediaQuery.highContrastOf(context);
+  /// MediaQuery.highContrast) — Android has no direct equivalent, so the
+  /// app-level "Reduce glass effect" toggle in Settings feeds in here too.
+  static bool of(BuildContext context) {
+    if (MediaQuery.highContrastOf(context)) return true;
+    if (Get.isRegistered<CSettings>()) {
+      try {
+        return Get.find<CSettings>().reduceGlass;
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final reduce = reduceTransparency || GlassLite.of(context);
+    // Read the toggle reactively: flipping "Reduce glass effect" in Settings
+    // rebuilds every glass surface app-wide with no per-screen state.
+    final contrast = MediaQuery.highContrastOf(context);
+    if (!Get.isRegistered<CSettings>()) {
+      return _Tile(
+          radius: radius, padding: padding, reduce: reduceTransparency || contrast, child: child);
+    }
+    final settings = Get.find<CSettings>();
+    return Obx(() => _Tile(
+          radius: radius,
+          padding: padding,
+          reduce: reduceTransparency || contrast || settings.reduceGlass,
+          child: child,
+        ));
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DoubleProperty('radius', radius));
+    properties.add(FlagProperty('reduceTransparency',
+        value: reduceTransparency, ifFalse: 'system'));
+  }
+}
+
+/// The actual tile: solid when [reduce], blurred glass otherwise. Split out so
+/// the reactive wrapper above stays trivial.
+class _Tile extends StatelessWidget {
+  final double radius;
+  final EdgeInsetsGeometry? padding;
+  final bool reduce;
+  final Widget child;
+
+  const _Tile({required this.radius, required this.padding, required this.reduce, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
 
     final tile = Container(
@@ -50,9 +98,7 @@ class GlassLite extends StatelessWidget {
         color: reduce ? AppColor.surface : AppColor.surface.withValues(alpha: 0.80),
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: dark
-              ? Colors.white.withValues(alpha: 0.28)
-              : AppColor.border,
+          color: dark ? Colors.white.withValues(alpha: 0.28) : AppColor.border,
           width: 1,
         ),
       ),
@@ -76,14 +122,6 @@ class GlassLite extends StatelessWidget {
         child: tile,
       ),
     );
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DoubleProperty('radius', radius));
-    properties.add(FlagProperty('reduceTransparency',
-        value: reduceTransparency, ifFalse: 'system'));
   }
 }
 

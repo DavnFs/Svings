@@ -26,15 +26,25 @@ class FloatingTabBar extends StatefulWidget {
 
   const FloatingTabBar({super.key, required this.index, required this.onChanged});
 
-  static const tabs = [
-    _TabSpec('Home', Icons.home_outlined, Icons.home, 'Home'),
-    _TabSpec('Income', Icons.arrow_downward_rounded, Icons.south_rounded, 'Income records'),
-    _TabSpec('Expense', Icons.arrow_upward_rounded, Icons.north_rounded, 'Expense records'),
-    _TabSpec('History', Icons.receipt_long_outlined, Icons.receipt_long, 'Transaction history'),
-  ];
-
   @override
   State<FloatingTabBar> createState() => _FloatingTabBarState();
+}
+
+/// The four tabs, in display order. Single source of truth: MainShell builds
+/// its IndexedStack pages in [MainTab.values] order and passes the selected
+/// tab's index here, so render order and highlight can never drift apart.
+enum MainTab {
+  home('Home', Icons.home_outlined, Icons.home, 'Home'),
+  income('Income', Icons.arrow_downward_rounded, Icons.south_rounded, 'Income records'),
+  expense('Expense', Icons.arrow_upward_rounded, Icons.north_rounded, 'Expense records'),
+  history('History', Icons.receipt_long_outlined, Icons.receipt_long, 'Transaction history');
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final String tooltip;
+
+  const MainTab(this.label, this.icon, this.selectedIcon, this.tooltip);
 }
 
 class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProviderStateMixin {
@@ -44,7 +54,7 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
   void initState() {
     super.initState();
     _slide = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
-    _slide.value = widget.index / (FloatingTabBar.tabs.length - 1);
+    _slide.value = _fraction(widget.index);
   }
 
   @override
@@ -52,7 +62,7 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
     super.didUpdateWidget(old);
     if (old.index != widget.index) {
       _slide.animateTo(
-        widget.index / (FloatingTabBar.tabs.length - 1),
+        _fraction(widget.index),
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 350),
@@ -60,6 +70,10 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
       );
     }
   }
+
+  /// Selected tab as 0..1 across the row. One helper for init + retarget so
+  /// the two can never disagree on the divisor.
+  static double _fraction(int index) => index / (MainTab.values.length - 1);
 
   @override
   void dispose() {
@@ -87,19 +101,22 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
                 border: Border.all(color: AppColor.border, width: 0.5),
               ),
               child: LayoutBuilder(builder: (context, constraints) {
-                final count = FloatingTabBar.tabs.length;
+                final count = MainTab.values.length;
                 final cell = constraints.maxWidth / count;
                 return Stack(children: [
                   AnimatedBuilder(
                     animation: _slide,
                     builder: (context, _) => Positioned(
-                      left: _slide.value * cell,
+                      // Indicator center tracks the selected CELL's center, not
+                      // N/cell-widths from the left: padding + pill insets mean
+                      // "index * cell" drifts (the old bug — Expense landed
+                      // between Home and Income, History on Income).
+                      left: (_slide.value * (count - 1) + 0.5) * cell - (cell * 0.86) / 2,
                       top: 0,
                       bottom: 0,
-                      width: cell,
+                      width: cell * 0.86,
                       child: Center(
                         child: Container(
-                          width: cell * 0.86,
                           decoration: BoxDecoration(
                             color: AppColor.accent.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(100),
@@ -110,7 +127,7 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
                   ),
                   Row(
                     children: List.generate(count, (i) {
-                      final spec = FloatingTabBar.tabs[i];
+                      final spec = MainTab.values[i];
                       final selected = i == widget.index;
                       return SizedBox(
                         width: cell,
@@ -165,13 +182,4 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
       ),
     );
   }
-}
-
-class _TabSpec {
-  final String label;
-  final IconData icon;
-  final IconData selectedIcon;
-  final String tooltip;
-
-  const _TabSpec(this.label, this.icon, this.selectedIcon, this.tooltip);
 }

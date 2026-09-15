@@ -12,7 +12,8 @@ import 'package:cause_money_record/presentation/page/history/history_form_page.d
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
-import 'package:cause_money_record/presentation/widget/floating_tab_bar.dart';
+import 'package:cause_money_record/presentation/widget/floating_tab_bar.dart'
+    show FloatingTabBar, MainTab;
 import 'package:cause_money_record/presentation/widget/frosted_bar.dart';
 
 /// Primary navigation shell: a floating BitChord-style glass pill on the
@@ -26,7 +27,7 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _index = 0;
+  MainTab _tab = MainTab.home;
 
   late final CUser cUser;
   late final CHome cHome;
@@ -45,7 +46,7 @@ class _MainShellState extends State<MainShell> {
     await cHome.getAnalysis(id);
   }
 
-  void _selectTab(int i) => setState(() => _index = i);
+  void _selectTab(int i) => setState(() => _tab = MainTab.values[i]);
 
   Future<void> _newEntry() async {
     HapticFeedback.lightImpact();
@@ -74,7 +75,7 @@ class _MainShellState extends State<MainShell> {
             onRefresh: _refresh,
             // Plain setState tab switch — no Rx read here, so no Obx.
             child: IndexedStack(
-              index: _index,
+              index: _tab.index,
               children: const [
                 _TabPage(child: HomeBody()),
                 _TabPage(child: IncomeOutcomeBody(type: 'Pemasukan')),
@@ -87,7 +88,7 @@ class _MainShellState extends State<MainShell> {
             left: 16,
             right: 16,
             bottom: 0,
-            child: FloatingTabBar(index: _index, onChanged: _selectTab),
+            child: FloatingTabBar(index: _tab.index, onChanged: _selectTab),
           ),
         ]),
       ),

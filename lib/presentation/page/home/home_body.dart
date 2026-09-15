@@ -39,7 +39,7 @@ class HomeBody extends StatelessWidget {
         ]);
       }
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
           const _SectionHeader(title: 'Today'),
           const SizedBox(height: 8),

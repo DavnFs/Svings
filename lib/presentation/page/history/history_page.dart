@@ -132,7 +132,7 @@ class _HistoryBodyState extends State<HistoryBody> {
                 color: AppColor.accent,
                 onRefresh: () async => _refresh(),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
                   children: [
                     _GroupedList(
                       itemCount: filtered.length,

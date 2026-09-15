@@ -12,11 +12,12 @@ import 'package:cause_money_record/presentation/page/history/history_form_page.d
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
-import 'package:cause_money_record/presentation/widget/app_nav_bar.dart';
+import 'package:cause_money_record/presentation/widget/floating_tab_bar.dart';
+import 'package:cause_money_record/presentation/widget/frosted_bar.dart';
 
-/// Primary navigation shell per DESIGN.md: flat frosted nav strip on the
-/// bottom edge (NOT a floating capsule), four tabs in an IndexedStack, and a
-/// standard FAB for the primary "new entry" action.
+/// Primary navigation shell: a floating BitChord-style glass pill on the
+/// bottom edge, four tabs in an IndexedStack, and a standard FAB for the
+/// primary "new entry" action.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -62,26 +63,33 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColor.surface,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
-        child: _Header(onSignOut: _signOut),
-      ),
+      // extendBody lets the list scroll UNDER the floating pill; the bottom
+      // padding on the lists keeps the last row clear of it.
+      extendBody: true,
       body: SafeArea(
-        top: false,
-        child: RefreshIndicator(
-          color: AppColor.accent,
-          onRefresh: _refresh,
-          // Plain setState tab switch — no Rx read here, so no Obx.
-          child: IndexedStack(
-            index: _index,
-            children: const [
-              HomeBody(),
-              IncomeOutcomeBody(type: 'Pemasukan'),
-              IncomeOutcomeBody(type: 'Pengeluaran'),
-              HistoryBody(),
-            ],
+        bottom: false,
+        child: Stack(children: [
+          RefreshIndicator(
+            color: AppColor.accent,
+            onRefresh: _refresh,
+            // Plain setState tab switch — no Rx read here, so no Obx.
+            child: IndexedStack(
+              index: _index,
+              children: const [
+                _TabPage(child: HomeBody()),
+                _TabPage(child: IncomeOutcomeBody(type: 'Pemasukan')),
+                _TabPage(child: IncomeOutcomeBody(type: 'Pengeluaran')),
+                _TabPage(child: HistoryBody()),
+              ],
+            ),
           ),
-        ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 0,
+            child: FloatingTabBar(index: _index, onChanged: _selectTab),
+          ),
+        ]),
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('main_new_entry_fab'),
@@ -91,48 +99,59 @@ class _MainShellState extends State<MainShell> {
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
-      bottomNavigationBar: AppNavBar(index: _index, onChanged: _selectTab),
     );
   }
 }
 
-/// Solid header: avatar + greeting + sign out. Matte surface, no glass — the
-/// dose cap reserves frost for the Top Bar and Bottom Nav only.
-class _Header extends StatelessWidget {
-  final VoidCallback onSignOut;
+/// One tab page: frosted top bar + header + content. The bar is the dose-cap's
+/// first frosted element; everything below it is matte.
+class _TabPage extends StatelessWidget {
+  final Widget child;
 
-  const _Header({required this.onSignOut});
+  const _TabPage({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColor.surface,
+    return Column(children: [
+      const _TopBar(),
+      Expanded(child: child),
+    ]);
+  }
+}
+
+/// Frosted top bar: avatar + greeting + sign out over the shared material.
+class _TopBar extends StatelessWidget {
+  const _TopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = context.findAncestorStateOfType<_MainShellState>()!;
+    return FrostedBar(
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
           child: Row(children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(AppAsset.profile, width: 44, height: 44),
+              child: Image.asset(AppAsset.profile, width: 40, height: 40),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
-              GetX<CUser>(
-                builder: (c) => Text(
-                  c.name,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
-                ),
+            Expanded(child: GetX<CUser>(
+              builder: (c) => Text(
+                c.name.isEmpty ? 'Hi,' : 'Hi, ${c.name}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
               ),
-            ])),
+            )),
             Semantics(
               label: 'Sign out',
               button: true,
               child: IconButton(
                 tooltip: 'Sign out',
                 icon: Icon(Icons.logout, color: AppColor.danger, size: 20),
-                onPressed: onSignOut,
+                onPressed: shell._signOut,
               ),
             ),
           ]),

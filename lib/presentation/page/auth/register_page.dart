@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_asset.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -59,13 +61,15 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColor.surface,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColor.textPrimary,
         elevation: 0,
       ),
-      body: SafeArea(
+      body: AuroraBackground(
+        child: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -106,12 +110,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 36),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColor.card,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColor.border),
-                    ),
+                  GlassCard(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
@@ -189,7 +188,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         onPressed: _loading.value ? null : _register,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColor.primary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppColor.onPrimary,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -200,11 +199,11 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                         child: _loading.value
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                  color: Colors.white,
+                                  color: AppColor.onPrimary,
                                   strokeWidth: 2.5,
                                 ),
                               )
@@ -237,6 +236,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -293,6 +293,10 @@ class _RegisterPageState extends State<RegisterPage> {
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: AppColor.danger),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColor.danger, width: 1.5),
             ),
           ),
         ),

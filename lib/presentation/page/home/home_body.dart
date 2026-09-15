@@ -7,6 +7,8 @@ import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
+import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 /// The home dashboard — today's total, the weekly bar chart, and the monthly
@@ -68,32 +70,51 @@ class HomeBody extends StatelessWidget {
       );
 
   Widget _todayCard(BuildContext context, CHome cHome) {
+    // Glass ink on the accent fill: the hero card is a saturated accent plate
+    // so the aurora-fed glass around it has something vivid to answer.
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: AppColor.primary, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary, scheme.tertiary],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+        boxShadow: [
+          BoxShadow(color: scheme.primary.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 10)),
+        ],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Obx(() => Text(
               AppFormat.currency(cHome.today),
               style: Theme.of(context)
                   .textTheme
                   .headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
+                  ?.copyWith(fontWeight: FontWeight.w700, color: scheme.onPrimary),
             )),
         const SizedBox(height: 4),
-        Obx(() => Text(cHome.todayPercent, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13))),
+        Obx(() => Text(cHome.todayPercent,
+            style: TextStyle(color: scheme.onPrimary.withValues(alpha: 0.75), fontSize: 13))),
         const SizedBox(height: 16),
         Obx(() {
           final todayId = cHome.todayId;
           if (todayId == null) return const SizedBox.shrink();
-          return GestureDetector(
-            onTap: () => Get.to(() => DetailHistoryPage(idHistory: todayId)),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+          return LiquidGlass(
+            radius: 12,
+            blur: 12,
+            tint: Colors.white,
+            alpha: 0.22,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            child: Pressable(
+              onTap: () => Get.to(() => DetailHistoryPage(idHistory: todayId)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('View Details',
+                    style: TextStyle(color: scheme.onPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_forward, color: scheme.onPrimary, size: 16),
               ]),
             ),
           );
@@ -103,13 +124,8 @@ class HomeBody extends StatelessWidget {
   }
 
   Widget _weeklyChart(CHome cHome) {
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColor.border),
-      ),
       child: Obx(() {
         final data = cHome.week;
         final labels = cHome.weekText();
@@ -122,10 +138,10 @@ class HomeBody extends StatelessWidget {
               loading: false,
               error: null,
               empty: true,
-              child: SizedBox.shrink(),
               emptyTitle: 'Belum ada data minggu ini',
               emptyMessage: 'Catat transaksi pertama Anda untuk melihat grafik',
               emptyIcon: Icons.bar_chart_outlined,
+              child: SizedBox.shrink(),
             ),
           );
         }
@@ -162,13 +178,8 @@ class HomeBody extends StatelessWidget {
   }
 
   Widget _monthlySection(CHome cHome) {
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColor.border),
-      ),
       child: Obx(() {
         if (cHome.monthIncome == 0 && cHome.monthOutcome == 0) {
           return const SizedBox(
@@ -177,10 +188,10 @@ class HomeBody extends StatelessWidget {
               loading: false,
               error: null,
               empty: true,
-              child: SizedBox.shrink(),
               emptyTitle: 'Belum ada transaksi bulan ini',
               emptyMessage: 'Tambah Pemasukan atau Pengeluaran untuk mulai melacak',
               emptyIcon: Icons.pie_chart_outline,
+              child: SizedBox.shrink(),
             ),
           );
         }

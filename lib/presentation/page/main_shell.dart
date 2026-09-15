@@ -12,7 +12,9 @@ import 'package:cause_money_record/presentation/page/history/history_form_page.d
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
 import 'package:cause_money_record/presentation/widget/glass_nav_bar.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 import 'package:cause_money_record/presentation/widget/pressable.dart';
 
 /// Primary navigation shell: a floating glass pill ([GlassNavBar]) over an
@@ -40,7 +42,11 @@ class _MainShellState extends State<MainShell> {
     if (cUser.id.isNotEmpty) cHome.getAnalysis(cUser.id);
   }
 
-  Future<void> _refresh() => cHome.getAnalysis(cUser.id);
+  Future<void> _refresh() async {
+    final id = cUser.id;
+    if (id.isEmpty) return;
+    await cHome.getAnalysis(id);
+  }
 
   void _selectTab(int i) => setState(() => _index = i);
 
@@ -71,9 +77,11 @@ class _MainShellState extends State<MainShell> {
     );
 
     return Scaffold(
-      backgroundColor: AppColor.surface,
+      // Transparent so the shared aurora shows through on every tab.
+      backgroundColor: Colors.transparent,
       extendBody: true,
-      body: SafeArea(
+      body: AuroraBackground(
+        child: SafeArea(
         bottom: false,
         child: Stack(children: [
           Column(children: [
@@ -82,28 +90,28 @@ class _MainShellState extends State<MainShell> {
               child: RefreshIndicator(
                 color: AppColor.accent,
                 onRefresh: _refresh,
-                child: Obx(
-                  () => reduce
-                      ? IndexedStack(
-                          index: _index,
-                          children: const [
-                            HomeBody(),
-                            IncomeOutcomeBody(type: 'Pemasukan'),
-                            IncomeOutcomeBody(type: 'Pengeluaran'),
-                            HistoryBody(),
-                          ],
-                        )
-                      : AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeOutCubic,
-                          transitionBuilder: (child, animation) => FadeTransition(
-                            opacity: animation,
-                            child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(animation), child: child),
-                          ),
-                          child: stack,
+                // ponytail: plain setState tab switch — no Rx is read here, so
+                // wrapping this in Obx trips GetX's improper-use warning.
+                child: reduce
+                    ? IndexedStack(
+                        index: _index,
+                        children: const [
+                          HomeBody(),
+                          IncomeOutcomeBody(type: 'Pemasukan'),
+                          IncomeOutcomeBody(type: 'Pengeluaran'),
+                          HistoryBody(),
+                        ],
+                      )
+                    : AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeOutCubic,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(animation), child: child),
                         ),
-                ),
+                        child: stack,
+                      ),
               ),
             ),
           ]),
@@ -125,6 +133,7 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
         ]),
+        ),
       ),
     );
   }
@@ -132,30 +141,32 @@ class _MainShellState extends State<MainShell> {
   Widget _header(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Row(children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.asset(AppAsset.profile, width: 44, height: 44),
-        ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
-          Obx(() => Text(
-                cUser.name,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
-              )),
-        ])),
-        Semantics(
-          label: 'Sign out',
-          button: true,
-          child: Pressable(
-            onTap: _signOut,
-            child: Material(
-              color: AppColor.card.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(12),
+      child: LiquidGlass(
+        radius: 20,
+        blur: 20,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(AppAsset.profile, width: 44, height: 44),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
+            Obx(() => Text(
+                  cUser.name,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+                )),
+          ])),
+          Semantics(
+            label: 'Sign out',
+            button: true,
+            child: Pressable(
+              onTap: _signOut,
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
+                  color: AppColor.card.withValues(alpha: 0.5),
                   border: Border.all(color: AppColor.border.withValues(alpha: 0.5)),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -163,8 +174,8 @@ class _MainShellState extends State<MainShell> {
               ),
             ),
           ),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 }

@@ -9,7 +9,9 @@ import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
 import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
@@ -24,9 +26,10 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColor.surface,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: const GlassAppBar(title: 'Transaction History'),
-      body: const HistoryBody(),
+      body: const AuroraBackground(child: HistoryBody()),
     );
   }
 }
@@ -72,37 +75,14 @@ class _HistoryBodyState extends State<HistoryBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColor.surface,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
-        child: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: AppBar(
-              backgroundColor: AppColor.surface.withValues(alpha: 0.75),
-              foregroundColor: AppColor.textPrimary,
-              elevation: 0,
-              centerTitle: true,
-              title: const Text(
-                'Transaction History',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-              ),
-            ),
-          ),
-        ),
-      ),
-      body: Column(
+    return Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Container(
+            child: LiquidGlass(
+              radius: 14,
+              blur: 16,
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColor.card,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColor.border),
-              ),
               child: Row(
                 children: ['All', 'Income', 'Expense'].map((f) {
                   final isSelected = _filter == f;
@@ -188,12 +168,8 @@ class _HistoryBodyState extends State<HistoryBody> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColor.card,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColor.border),
-                      ),
+                    GlassCard(
+                      padding: EdgeInsets.zero,
                       child: ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -285,7 +261,6 @@ class _HistoryBodyState extends State<HistoryBody> {
             }),
           ),
         ],
-      ),
     );
   }
 }

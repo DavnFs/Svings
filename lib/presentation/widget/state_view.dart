@@ -109,7 +109,7 @@ class StateView extends StatelessWidget {
                   onPressed: onRetry,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColor.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColor.onPrimary,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     shape: RoundedRectangleBorder(

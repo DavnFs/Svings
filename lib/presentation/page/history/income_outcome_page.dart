@@ -9,7 +9,10 @@ import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_income_outcome.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_form_page.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
 import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
+import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 /// Money entries of one type — 'Pemasukan' or 'Pengeluaran'.
@@ -32,9 +35,10 @@ class _IncomeOutcomePageState extends State<IncomeOutcomePage> {
     final titleText = isIncome ? 'Income Records' : 'Expense Records';
 
     return Scaffold(
-      backgroundColor: AppColor.surface,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(title: titleText),
-      body: IncomeOutcomeBody(type: widget.type),
+      body: AuroraBackground(child: IncomeOutcomeBody(type: widget.type)),
     );
   }
 }
@@ -77,29 +81,12 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
   @override
   Widget build(BuildContext context) {
     final isIncome = widget.type == 'Pemasukan';
-    final titleText = isIncome ? 'Income Records' : 'Expense Records';
+    return Obx(() {
+      return _list(context, isIncome);
+    });
+  }
 
-    return Scaffold(
-      backgroundColor: AppColor.surface,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
-        child: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: AppBar(
-              backgroundColor: AppColor.surface.withValues(alpha: 0.75),
-              foregroundColor: AppColor.textPrimary,
-              elevation: 0,
-              centerTitle: true,
-              title: Text(
-                titleText,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-              ),
-            ),
-          ),
-        ),
-      ),
-      body: Obx(() {
+  Widget _list(BuildContext context, bool isIncome) {
         if (cInOut.loading) {
           return const StateView(
             loading: true,
@@ -129,7 +116,7 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
                   loading: false,
                   error: null,
                   empty: true,
-                  emptyTitle: 'No $titleText Yet',
+                  emptyTitle: isIncome ? 'No Income Records Yet' : 'No Expense Records Yet',
                   emptyMessage: 'New entries created under this category will show up here.',
                   emptyIcon: isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                   child: const SizedBox.shrink(),
@@ -145,12 +132,8 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColor.card,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColor.border),
-                ),
+              GlassCard(
+                padding: EdgeInsets.zero,
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -164,9 +147,8 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
                   ),
                   itemBuilder: (context, index) {
                     final h = cInOut.list[index];
-                    return InkWell(
+                    return Pressable(
                       onTap: () => Get.to(() => DetailHistoryPage(idHistory: h.idHistory!)),
-                      borderRadius: BorderRadius.circular(14),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         child: Row(
@@ -205,14 +187,19 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
                                 fontSize: 14,
                               ),
                             ),
-                            PopupMenuButton<String>(
-                              icon: Icon(Icons.more_vert_rounded, color: AppColor.textSecondary, size: 20),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'update', child: Text('Edit')),
-                                PopupMenuItem(value: 'delete', child: Text('Delete')),
-                              ],
-                              onSelected: (v) => _handleMenu(v, h),
+                            Semantics(
+                              label: 'More actions for entry on ${AppFormat.date(h.date)}',
+                              button: true,
+                              child: PopupMenuButton<String>(
+                                tooltip: 'More actions',
+                                icon: Icon(Icons.more_vert_rounded, color: AppColor.textSecondary, size: 20),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(value: 'update', child: Text('Edit')),
+                                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                ],
+                                onSelected: (v) => _handleMenu(v, h),
+                              ),
                             ),
                           ],
                         ),
@@ -224,7 +211,5 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
             ],
           ),
         );
-      }),
-    );
   }
 }

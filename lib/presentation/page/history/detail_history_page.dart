@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
 import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 class DetailHistoryPage extends StatefulWidget {
@@ -27,9 +29,11 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColor.surface,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: const GlassAppBar(title: 'Transaction Detail'),
-      body: Obx(() {
+      body: AuroraBackground(
+        child: Obx(() {
         final d = cDetail.data;
         if (d == null) {
           return const StateView(
@@ -45,13 +49,9 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
-            Container(
+            GlassCard(
+              radius: 20,
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColor.card,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColor.border),
-              ),
               child: Column(
                 children: [
                   Container(
@@ -156,12 +156,8 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
               ),
             ),
             const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColor.card,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColor.border),
-              ),
+            GlassCard(
+              padding: EdgeInsets.zero,
               child: ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -226,6 +222,7 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
           ],
         );
       }),
+      ),
     );
   }
 }

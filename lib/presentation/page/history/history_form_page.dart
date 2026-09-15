@@ -9,7 +9,9 @@ import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
 import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 import 'package:cause_money_record/presentation/widget/pressable.dart';
 
 /// Create or edit a transaction. Pass [idHistory] to edit, omit it to create.
@@ -94,19 +96,16 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     final isIncome = c.type == 'Pemasukan';
 
     return Scaffold(
-      backgroundColor: AppColor.surface,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(title: _isEditing ? 'Edit Entry' : 'New Entry'),
-      body: ListView(
+      body: AuroraBackground(
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
           _sectionLabel('Transaction Details'),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColor.card,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColor.border),
-            ),
+          GlassCard(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
@@ -233,12 +232,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
           const SizedBox(height: 24),
           _sectionLabel('Add Item'),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColor.card,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColor.border),
-            ),
+          GlassCard(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
@@ -267,12 +261,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
           const SizedBox(height: 24),
           _sectionLabel('Recorded Items'),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColor.card,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColor.border),
-            ),
+          GlassCard(
             padding: const EdgeInsets.all(16),
             child: Obx(() {
               if (c.items.isEmpty) {
@@ -368,7 +357,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                 onPressed: c.items.isNotEmpty ? _submit : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColor.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColor.onPrimary,
                   disabledBackgroundColor: AppColor.border,
                   disabledForegroundColor: AppColor.textSecondary,
                   elevation: 0,
@@ -380,6 +369,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

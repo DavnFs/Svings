@@ -6,6 +6,8 @@ import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/page/auth/register_page.dart';
 import 'package:cause_money_record/presentation/page/main_shell.dart';
+import 'package:cause_money_record/presentation/widget/aurora_background.dart';
+import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -51,8 +53,9 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColor.surface,
-      body: SafeArea(
+      backgroundColor: Colors.transparent,
+      body: AuroraBackground(
+        child: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -75,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Welcome to Uangku',
+                    'Welcome to svings',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -93,12 +96,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 36),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColor.card,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColor.border),
-                    ),
+                  GlassCard(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
@@ -168,7 +166,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: _loading.value ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColor.primary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppColor.onPrimary,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -179,11 +177,11 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         child: _loading.value
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                  color: Colors.white,
+                                  color: AppColor.onPrimary,
                                   strokeWidth: 2.5,
                                 ),
                               )
@@ -216,6 +214,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -272,6 +271,10 @@ class _LoginPageState extends State<LoginPage> {
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: AppColor.danger),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColor.danger, width: 1.5),
             ),
           ),
         ),

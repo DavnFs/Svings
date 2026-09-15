@@ -1,8 +1,7 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cause_money_record/config/app_color.dart';
+import 'package:cause_money_record/presentation/widget/glass_lite.dart';
 import 'package:cause_money_record/presentation/widget/pressable.dart';
 
 /// Floating glass pill modeled on BitChord's `FloatingTabBar` expanded state:
@@ -83,24 +82,20 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final highContrast = MediaQuery.highContrastOf(context);
+    final reduce = GlassLite.of(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(0, 0, 0, 16 + bottom),
+      // RepaintBoundary keeps the blur layer off the scrolling lists'
+      // repaint path — the pill never repaints because content moved.
       child: RepaintBoundary(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(100),
-          child: BackdropFilter(
-            filter: highContrast ? ImageFilter.blur() : ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              decoration: BoxDecoration(
-                color: highContrast ? AppColor.surface : AppColor.surface.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(100),
-                border: Border.all(color: AppColor.border, width: 0.5),
-              ),
-              child: LayoutBuilder(builder: (context, constraints) {
+        child: GlassLite(
+          // Fully-rounded cluster like BitChord's RoundedCornerShape(100).
+          radius: 100,
+          reduceTransparency: reduce,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: LayoutBuilder(builder: (context, constraints) {
                 final count = MainTab.values.length;
                 final cell = constraints.maxWidth / count;
                 return Stack(children: [
@@ -176,8 +171,6 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
                   ),
                 ]);
               }),
-            ),
-          ),
         ),
       ),
     );

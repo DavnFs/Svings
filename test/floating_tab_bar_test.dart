@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cause_money_record/presentation/page/main_shell.dart';
 import 'package:cause_money_record/presentation/widget/floating_tab_bar.dart';
 
 /// The pill indicator, the tab cells, and the IndexedStack pages all derive

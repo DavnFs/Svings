@@ -127,7 +127,11 @@ class _FloatingTabBarState extends State<FloatingTabBar> with SingleTickerProvid
                                 widget.onChanged(i);
                               },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+                                // No horizontal padding: the cell is already
+                                // narrow (~1/4 of the pill). Padding here stole
+                                // ~40dp per tab and clipped "History" on small
+                                // screens; the cell itself is the tap target.
+                                padding: const EdgeInsets.symmetric(vertical: 6),
                                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                                   Icon(
                                     selected ? spec.selectedIcon : spec.icon,

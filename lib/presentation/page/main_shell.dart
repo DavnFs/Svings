@@ -91,13 +91,18 @@ class _MainShellState extends State<MainShell> {
           ),
         ]),
       ),
-      floatingActionButton: FloatingActionButton(
-        key: const Key('main_new_entry_fab'),
-        onPressed: _newEntry,
-        tooltip: 'Record new entry',
-        backgroundColor: AppColor.accent,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        // DESIGN.md is silent on FAB placement; (a) is the smaller change:
+        // float above the pill — pill (~66dp) + 16dp margin + safe area.
+        padding: EdgeInsets.only(bottom: 82 + MediaQuery.paddingOf(context).bottom),
+        child: FloatingActionButton(
+          key: const Key('main_new_entry_fab'),
+          onPressed: _newEntry,
+          tooltip: 'Record new entry',
+          backgroundColor: AppColor.accent,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

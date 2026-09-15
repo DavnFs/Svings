@@ -126,6 +126,22 @@ class _WeeklyChart extends StatelessWidget {
 
   const _WeeklyChart({required this.cHome});
 
+  /// Short axis label: full integers overflow 1/7 of the card width (a 5-digit
+  /// total like 19570 needs ~30dp in a ~44dp cell), and the overflow rendered
+  /// as a wrapped fragment that looked like a stray "/" ("195/0"). Compact
+  /// form keeps every label on one line: 19570 -> "19,6rb".
+  static String _compactValue(double v) {
+    if (v >= 1000000) {
+      final s = (v / 1000000).toStringAsFixed(1).replaceAll('.', ',');
+      return '${s}jt';
+    }
+    if (v >= 1000) {
+      final s = (v / 1000).toStringAsFixed(1).replaceAll('.', ',');
+      return '${s}rb';
+    }
+    return v.toInt().toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return _GroupCard(
@@ -155,13 +171,22 @@ class _WeeklyChart extends StatelessWidget {
             children: List.generate(7, (i) {
               final ratio = data[i] / maxVal;
               return Expanded(
+                // Tight cells: 7 columns share the card width, so each keeps
+                // only 2dp gutters — 4dp each side clipped the last bar.
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       if (data[i] > 0)
-                        Text('${data[i].toInt()}', style: TextStyle(fontSize: 9, color: AppColor.textSecondary)),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _compactValue(data[i]),
+                            maxLines: 1,
+                            style: TextStyle(fontSize: 9, color: AppColor.textSecondary),
+                          ),
+                        ),
                       const SizedBox(height: 4),
                       Container(
                         height: (ratio * 120).clamp(4.0, 120),

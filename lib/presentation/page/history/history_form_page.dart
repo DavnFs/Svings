@@ -9,9 +9,7 @@ import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
-import 'package:cause_money_record/presentation/widget/aurora_background.dart';
-import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
+import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
 import 'package:cause_money_record/presentation/widget/pressable.dart';
 
 /// Create or edit a transaction. Pass [idHistory] to edit, omit it to create.
@@ -25,8 +23,8 @@ class HistoryFormPage extends StatefulWidget {
 }
 
 class _HistoryFormPageState extends State<HistoryFormPage> {
-  final c = Get.put(CHistoryForm());
-  final cUser = Get.put(CUser());
+  late final CHistoryForm c;
+  late final CUser cUser;
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
 
@@ -35,6 +33,9 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
   @override
   void initState() {
     super.initState();
+    c = Get.find<CHistoryForm>();
+    cUser = Get.find<CUser>();
+    c.reset();
     if (_isEditing) c.load(widget.idHistory!);
   }
 
@@ -96,17 +97,13 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     final isIncome = c.type == 'Pemasukan';
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(title: _isEditing ? 'Edit Entry' : 'New Entry'),
-      body: AuroraBackground(
-        child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      appBar: FrostedAppBar(title: _isEditing ? 'Edit Entry' : 'New Entry'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          _sectionLabel('Transaction Details'),
+          const _SectionLabel(text: 'Transaction Details'),
           const SizedBox(height: 8),
-          GlassCard(
-            padding: const EdgeInsets.all(16),
+          _FormGroup(
             child: Column(
               children: [
                 Obx(() {
@@ -230,15 +227,23 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
             ),
           ),
           const SizedBox(height: 24),
-          _sectionLabel('Add Item'),
+          const _SectionLabel(text: 'Add Item'),
           const SizedBox(height: 8),
-          GlassCard(
-            padding: const EdgeInsets.all(16),
+          _FormGroup(
             child: Column(
               children: [
-                _buildField(_nameController, 'Item Description (e.g. Lunch)', Icons.edit_note_rounded),
+                _ItemField(
+                  controller: _nameController,
+                  hint: 'Item Description (e.g. Lunch)',
+                  icon: Icons.edit_note_rounded,
+                ),
                 const SizedBox(height: 12),
-                _buildField(_priceController, 'Amount (Rp)', Icons.payments_outlined, isNumber: true),
+                _ItemField(
+                  controller: _priceController,
+                  hint: 'Amount (Rp)',
+                  icon: Icons.payments_outlined,
+                  isNumber: true,
+                ),
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -259,10 +264,9 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
             ),
           ),
           const SizedBox(height: 24),
-          _sectionLabel('Recorded Items'),
+          const _SectionLabel(text: 'Recorded Items'),
           const SizedBox(height: 8),
-          GlassCard(
-            padding: const EdgeInsets.all(16),
+          _FormGroup(
             child: Obx(() {
               if (c.items.isEmpty) {
                 return Center(
@@ -356,8 +360,8 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
               () => ElevatedButton(
                 onPressed: c.items.isNotEmpty ? _submit : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.primary,
-                  foregroundColor: AppColor.onPrimary,
+                  backgroundColor: AppColor.accent,
+                  foregroundColor: Colors.white,
                   disabledBackgroundColor: AppColor.border,
                   disabledForegroundColor: AppColor.textSecondary,
                   elevation: 0,
@@ -369,12 +373,47 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
             ),
           ),
         ],
-        ),
       ),
     );
   }
+}
 
-  Widget _buildField(TextEditingController controller, String hint, IconData icon, {bool isNumber = false}) {
+/// Single-surface form group: solid matte, radius 18, 16dp padding.
+class _FormGroup extends StatelessWidget {
+  final Widget child;
+
+  const _FormGroup({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColor.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColor.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// DESIGN.md input: radius 14, hairline border, accent focus ring.
+class _ItemField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool isNumber;
+
+  const _ItemField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    this.isNumber = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
@@ -386,14 +425,22 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
         filled: true,
         fillColor: AppColor.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColor.accent)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.accent)),
       ),
     );
   }
+}
 
-  Widget _sectionLabel(String text) {
+/// DESIGN.md section label: 13sp w700 secondary.
+class _SectionLabel extends StatelessWidget {
+  final String text;
+
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
     return Text(
       text,
       style: TextStyle(

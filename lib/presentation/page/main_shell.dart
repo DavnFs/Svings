@@ -12,17 +12,11 @@ import 'package:cause_money_record/presentation/page/history/history_form_page.d
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
-import 'package:cause_money_record/presentation/widget/aurora_background.dart';
-import 'package:cause_money_record/presentation/widget/glass_nav_bar.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
-import 'package:cause_money_record/presentation/widget/pressable.dart';
+import 'package:cause_money_record/presentation/widget/app_nav_bar.dart';
 
-/// Primary navigation shell: a floating glass pill ([GlassNavBar]) over an
-/// [IndexedStack] of the four top-level destinations, plus a compact action
-/// button for the one primary action (recording a new entry).
-///
-/// The body extends under the pill (`extendBody`) so content scrolls behind
-/// the glass — glass with nothing behind it is just a tint (skill §12).
+/// Primary navigation shell per DESIGN.md: flat frosted nav strip on the
+/// bottom edge (NOT a floating capsule), four tabs in an IndexedStack, and a
+/// standard FAB for the primary "new entry" action.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -33,12 +27,14 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
 
-  final cUser = Get.put(CUser());
-  late final cHome = Get.put(CHome());
+  late final CUser cUser;
+  late final CHome cHome;
 
   @override
   void initState() {
     super.initState();
+    cUser = Get.find<CUser>();
+    cHome = Get.find<CHome>();
     if (cUser.id.isNotEmpty) cHome.getAnalysis(cUser.id);
   }
 
@@ -64,117 +60,83 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final reduce = MediaQuery.disableAnimationsOf(context);
-    final stack = IndexedStack(
-      key: ValueKey(_index),
-      index: _index,
-      children: const [
-        HomeBody(),
-        IncomeOutcomeBody(type: 'Pemasukan'),
-        IncomeOutcomeBody(type: 'Pengeluaran'),
-        HistoryBody(),
-      ],
-    );
-
     return Scaffold(
-      // Transparent so the shared aurora shows through on every tab.
-      backgroundColor: Colors.transparent,
-      extendBody: true,
-      body: AuroraBackground(
-        child: SafeArea(
+      backgroundColor: AppColor.surface,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: _Header(onSignOut: _signOut),
+      ),
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          color: AppColor.accent,
+          onRefresh: _refresh,
+          // Plain setState tab switch — no Rx read here, so no Obx.
+          child: IndexedStack(
+            index: _index,
+            children: const [
+              HomeBody(),
+              IncomeOutcomeBody(type: 'Pemasukan'),
+              IncomeOutcomeBody(type: 'Pengeluaran'),
+              HistoryBody(),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        key: const Key('main_new_entry_fab'),
+        onPressed: _newEntry,
+        tooltip: 'Record new entry',
+        backgroundColor: AppColor.accent,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
+      ),
+      bottomNavigationBar: AppNavBar(index: _index, onChanged: _selectTab),
+    );
+  }
+}
+
+/// Solid header: avatar + greeting + sign out. Matte surface, no glass — the
+/// dose cap reserves frost for the Top Bar and Bottom Nav only.
+class _Header extends StatelessWidget {
+  final VoidCallback onSignOut;
+
+  const _Header({required this.onSignOut});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColor.surface,
+      child: SafeArea(
         bottom: false,
-        child: Stack(children: [
-          Column(children: [
-            _header(context),
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColor.accent,
-                onRefresh: _refresh,
-                // ponytail: plain setState tab switch — no Rx is read here, so
-                // wrapping this in Obx trips GetX's improper-use warning.
-                child: reduce
-                    ? IndexedStack(
-                        index: _index,
-                        children: const [
-                          HomeBody(),
-                          IncomeOutcomeBody(type: 'Pemasukan'),
-                          IncomeOutcomeBody(type: 'Pengeluaran'),
-                          HistoryBody(),
-                        ],
-                      )
-                    : AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeOutCubic,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(animation), child: child),
-                        ),
-                        child: stack,
-                      ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(AppAsset.profile, width: 44, height: 44),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
+              GetX<CUser>(
+                builder: (c) => Text(
+                  c.name,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+                ),
+              ),
+            ])),
+            Semantics(
+              label: 'Sign out',
+              button: true,
+              child: IconButton(
+                tooltip: 'Sign out',
+                icon: Icon(Icons.logout, color: AppColor.danger, size: 20),
+                onPressed: onSignOut,
               ),
             ),
           ]),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: GlassNavBar(index: _index, onChanged: _selectTab),
-          ),
-          Positioned(
-            right: 20,
-            bottom: 104,
-            child: FloatingActionButton.small(
-              onPressed: _newEntry,
-              tooltip: 'Record new entry',
-              backgroundColor: AppColor.primary,
-              foregroundColor: AppColor.onPrimary,
-              child: const Icon(Icons.add),
-            ),
-          ),
-        ]),
         ),
-      ),
-    );
-  }
-
-  Widget _header(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: LiquidGlass(
-        radius: 20,
-        blur: 20,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(AppAsset.profile, width: 44, height: 44),
-          ),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Hi,', style: TextStyle(fontSize: 14, color: AppColor.textSecondary)),
-            Obx(() => Text(
-                  cUser.name,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
-                )),
-          ])),
-          Semantics(
-            label: 'Sign out',
-            button: true,
-            child: Pressable(
-              onTap: _signOut,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColor.card.withValues(alpha: 0.5),
-                  border: Border.all(color: AppColor.border.withValues(alpha: 0.5)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.logout, color: AppColor.danger, size: 20),
-              ),
-            ),
-          ),
-        ]),
       ),
     );
   }

@@ -3,8 +3,6 @@ import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_asset.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
-import 'package:cause_money_record/presentation/widget/aurora_background.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -61,18 +59,16 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColor.textPrimary,
         elevation: 0,
       ),
-      body: AuroraBackground(
-        child: SafeArea(
+      body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Form(
               key: _formKey,
               child: Column(
@@ -110,19 +106,24 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 36),
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColor.card,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColor.border),
+                    ),
                     child: Column(
                       children: [
-                        _buildField(
+                        _RegisterField(
                           controller: _nameController,
                           label: 'Full Name',
                           hint: 'Your Name',
                           icon: Icons.person_outline_rounded,
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
                         ),
-                        const SizedBox(height: 18),
-                        _buildField(
+                        const SizedBox(height: 16),
+                        _RegisterField(
                           controller: _emailController,
                           label: 'Email',
                           hint: 'name@example.com',
@@ -130,8 +131,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           type: TextInputType.emailAddress,
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Email is required' : null,
                         ),
-                        const SizedBox(height: 18),
-                        _buildField(
+                        const SizedBox(height: 16),
+                        _RegisterField(
                           controller: _passwordController,
                           label: 'Password',
                           hint: 'Create a password',
@@ -187,8 +188,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       () => ElevatedButton(
                         onPressed: _loading.value ? null : _register,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColor.primary,
-                          foregroundColor: AppColor.onPrimary,
+                          backgroundColor: AppColor.accent,
+                          foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -199,11 +200,11 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                         child: _loading.value
-                            ? SizedBox(
+                            ? const SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                  color: AppColor.onPrimary,
+                                  color: Colors.white,
                                   strokeWidth: 2.5,
                                 ),
                               )
@@ -237,21 +238,35 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ),
         ),
-        ),
       ),
     );
   }
+}
 
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    Widget? suffixIcon,
-    TextInputType? type,
-    String? Function(String?)? validator,
-  }) {
+/// DESIGN.md register input: radius 14, hairline border, accent focus ring.
+class _RegisterField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final bool obscure;
+  final Widget? suffixIcon;
+  final TextInputType? type;
+  final String? Function(String?)? validator;
+
+  const _RegisterField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.obscure = false,
+    this.suffixIcon,
+    this.type,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -279,23 +294,23 @@ class _RegisterPageState extends State<RegisterPage> {
             fillColor: AppColor.surface,
             contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.accent, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.danger),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.danger, width: 1.5),
             ),
           ),

@@ -9,9 +9,7 @@ import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_income_outcome.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_form_page.dart';
-import 'package:cause_money_record/presentation/widget/aurora_background.dart';
-import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
+import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
 import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
@@ -32,13 +30,9 @@ class _IncomeOutcomePageState extends State<IncomeOutcomePage> {
   @override
   Widget build(BuildContext context) {
     final isIncome = widget.type == 'Pemasukan';
-    final titleText = isIncome ? 'Income Records' : 'Expense Records';
-
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(title: titleText),
-      body: AuroraBackground(child: IncomeOutcomeBody(type: widget.type)),
+      appBar: FrostedAppBar(title: isIncome ? 'Income Records' : 'Expense Records'),
+      body: IncomeOutcomeBody(type: widget.type),
     );
   }
 }
@@ -54,8 +48,16 @@ class IncomeOutcomeBody extends StatefulWidget {
 }
 
 class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
-  final cInOut = Get.put(CIncomeOutcome());
-  final cUser = Get.put(CUser());
+  late final CIncomeOutcome cInOut;
+  late final CUser cUser;
+
+  @override
+  void initState() {
+    super.initState();
+    cInOut = Get.find<CIncomeOutcome>();
+    cUser = Get.find<CUser>();
+    _refresh();
+  }
 
   void _refresh() => cInOut.getList(cUser.id, widget.type);
 
@@ -70,12 +72,6 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
         if (success) _refresh();
       }
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _refresh();
   }
 
   @override
@@ -130,10 +126,14 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
           color: AppColor.accent,
           onRefresh: () async => _refresh(),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              GlassCard(
-                padding: EdgeInsets.zero,
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColor.card,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColor.border),
+                ),
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),

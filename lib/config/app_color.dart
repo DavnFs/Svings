@@ -37,21 +37,23 @@ class AppColor {
   static bool get _dark => _brightness == Brightness.dark;
 
   // Literal fallbacks, used only when no scheme has been supplied yet.
-  static const _accentLight = Color(0xFF6C63FF);
-  static const _accentDark = Color(0xFFA9A2FF);
+  // DESIGN.md strict values.
+  static const _accentLight = Color(0xFF7C5CFF);
+  static const _accentDark = Color(0xFF9E8CFC);
   static const _surfaceLight = Color(0xFFF8F9FA);
-  static const _surfaceDark = Color(0xFF141218);
-  static const _cardDark = Color(0xFF211F26);
-  static const _borderLight = Color(0xFFE8ECF1);
-  static const _borderDark = Color(0xFF49454F);
-  static const _textPrimaryLight = Color(0xFF1A1A1A);
-  static const _textPrimaryDark = Color(0xFFE6E0E9);
+  static const _surfaceDark = Color(0xFF0E0D12);
+  static const _cardLight = Color(0xFFFFFFFF);
+  static const _cardDark = Color(0xFF1C1B24);
+  static const _borderLight = Color(0xFFE5E7EB);
+  static const _borderDark = Color(0xFF2B2936);
+  static const _textPrimaryLight = Color(0xFF111827);
+  static const _textPrimaryDark = Color(0xFFF3F4F6);
   static const _textSecondaryLight = Color(0xFF6B7280);
-  static const _textSecondaryDark = Color(0xFF938F99);
+  static const _textSecondaryDark = Color(0xFF9CA3AF);
   static const _dangerLight = Color(0xFFDC2626);
-  static const _dangerDark = Color(0xFFF2B8B5);
+  static const _dangerDark = Color(0xFFF87171);
   static const _incomeLight = Color(0xFF059669);
-  static const _incomeDark = Color(0xFF7EE2A8);
+  static const _incomeDark = Color(0xFF34D399);
 
   // Scheme-backed roles carrying dynamic color across call sites.
 
@@ -59,7 +61,7 @@ class AppColor {
 
   /// One tonal step above the surface. MD3 conveys elevation with tonal
   /// surface colour, not shadows.
-  static Color get card => _scheme?.surfaceContainerLow ?? (_dark ? _cardDark : Colors.white);
+  static Color get card => _scheme?.surfaceContainerLow ?? (_dark ? _cardDark : _cardLight);
 
   static Color get border => _scheme?.outlineVariant ?? (_dark ? _borderDark : _borderLight);
   static Color get textPrimary => _scheme?.onSurface ?? (_dark ? _textPrimaryDark : _textPrimaryLight);
@@ -83,7 +85,7 @@ class AppColor {
   /// Deliberately *not* scheme roles. MD3 has no "money in" role, and mapping
   /// income to `tertiary` would make it wallpaper-derived and possibly red,
   /// destroying the one colour distinction this app cannot afford to lose. Tuned
-  /// per brightness for contrast instead.
+  /// per brightness for contrast instead (DESIGN.md strict values).
   static Color get income => _dark ? _incomeDark : _incomeLight;
-  static Color get outcome => _scheme?.error ?? (_dark ? _dangerDark : _dangerLight);
+  static Color get outcome => _dark ? _dangerDark : _dangerLight;
 }

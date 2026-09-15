@@ -11,14 +11,14 @@ void main() {
   test('defaults to the light palette', () {
     expect(AppColor.surface, const Color(0xFFF8F9FA));
     expect(AppColor.card, Colors.white);
-    expect(AppColor.textPrimary, const Color(0xFF1A1A1A));
+    expect(AppColor.textPrimary, const Color(0xFF111827));
   });
 
   test('switches surfaces and text for dark', () {
     AppColor.useBrightness(Brightness.dark);
-    expect(AppColor.surface, const Color(0xFF141218));
-    expect(AppColor.card, const Color(0xFF211F26));
-    expect(AppColor.textPrimary, const Color(0xFFE6E0E9));
+    expect(AppColor.surface, const Color(0xFF0E0D12));
+    expect(AppColor.card, const Color(0xFF1C1B24));
+    expect(AppColor.textPrimary, const Color(0xFFF3F4F6));
   });
 
   test('primary stays dark in both schemes', () {

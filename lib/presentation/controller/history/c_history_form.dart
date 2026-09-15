@@ -32,6 +32,15 @@ class CHistoryForm extends GetxController {
   final _total = 0.0.obs;
   double get total => _total.value;
 
+  /// Clear stale state — the controller is app-scoped now, so a new entry must
+  /// not inherit the previous form's items.
+  void reset() {
+    _items.clear();
+    _total.value = 0;
+    _date.value = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _type.value = 'Pemasukan';
+  }
+
   void _recalculate() {
     double sum = 0;
     for (final item in _items) {

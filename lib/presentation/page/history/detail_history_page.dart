@@ -3,9 +3,7 @@ import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
-import 'package:cause_money_record/presentation/widget/aurora_background.dart';
-import 'package:cause_money_record/presentation/widget/glass_app_bar.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
+import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 class DetailHistoryPage extends StatefulWidget {
@@ -18,22 +16,50 @@ class DetailHistoryPage extends StatefulWidget {
 }
 
 class _DetailHistoryPageState extends State<DetailHistoryPage> {
-  final cDetail = Get.put(CDetailHistory());
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const FrostedAppBar(title: 'Transaction Detail'),
+      body: _DetailContent(idHistory: widget.idHistory),
+    );
+  }
+}
+
+/// Fetches the transaction then renders [_DetailView].
+class _DetailContent extends StatefulWidget {
+  final String idHistory;
+
+  const _DetailContent({required this.idHistory});
+
+  @override
+  State<_DetailContent> createState() => _DetailContentState();
+}
+
+class _DetailContentState extends State<_DetailContent> {
+  late final CDetailHistory cDetail;
 
   @override
   void initState() {
     super.initState();
+    cDetail = Get.find<CDetailHistory>();
     cDetail.getData(widget.idHistory);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(title: 'Transaction Detail'),
-      body: AuroraBackground(
-        child: Obx(() {
+    return _DetailView(cDetail: cDetail);
+  }
+}
+
+/// Reactive detail view: loading spinner, then hero + items.
+class _DetailView extends StatelessWidget {
+  final CDetailHistory cDetail;
+
+  const _DetailView({required this.cDetail});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
         final d = cDetail.data;
         if (d == null) {
           return const StateView(
@@ -47,11 +73,15 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
         final items = d.items;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            GlassCard(
-              radius: 20,
+            Container(
               padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColor.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColor.border),
+              ),
               child: Column(
                 children: [
                   Container(
@@ -156,8 +186,12 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
               ),
             ),
             const SizedBox(height: 10),
-            GlassCard(
-              padding: EdgeInsets.zero,
+            Container(
+              decoration: BoxDecoration(
+                color: AppColor.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColor.border),
+              ),
               child: ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -221,8 +255,6 @@ class _DetailHistoryPageState extends State<DetailHistoryPage> {
             ),
           ],
         );
-      }),
-      ),
-    );
+    });
   }
 }

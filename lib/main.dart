@@ -7,9 +7,28 @@ import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/config/supabase_config.dart';
 import 'package:cause_money_record/data/model/user.dart';
+import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
+import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
+import 'package:cause_money_record/presentation/controller/history/c_history.dart';
+import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
+import 'package:cause_money_record/presentation/controller/history/c_income_outcome.dart';
 import 'package:cause_money_record/presentation/page/auth/login_page.dart';
 import 'package:cause_money_record/presentation/page/main_shell.dart';
+
+/// All controllers are created once at startup, so no screen can ever hit a
+/// "not found" from a `Get.find` before its `put` ran.
+class AppBindings extends Bindings {
+  @override
+  void dependencies() {
+    Get.put(CUser(), permanent: true);
+    Get.put(CHome(), permanent: true);
+    Get.put(CHistory(), permanent: true);
+    Get.put(CIncomeOutcome(), permanent: true);
+    Get.put(CDetailHistory(), permanent: true);
+    Get.put(CHistoryForm(), permanent: true);
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,18 +40,15 @@ void main() async {
   runApp(const MyApp());
 }
 
-/// Single seed for both schemes. MD3 derives all ~30 color roles from this,
-/// replacing the hand-written palette where only 3 roles used to be set.
-const _seed = Color(0xFF6C63FF);
+/// Single seed for both schemes. DESIGN.md strict accent: #7C5CFF light.
+const _seed = Color(0xFF7C5CFF);
 
-/// Radius scale, derived from the values the screens already used inline.
-/// Flutter exposes shapes per component rather than as a global token set, so
-/// these are applied to each component theme below — one place to change
-/// instead of 84 scattered `BorderRadius.circular()` literals.
-const _radiusSmall = 12.0;   // inputs, chips, outlined buttons
-const _radiusButton = 14.0;  // primary action buttons
-const _radiusCard = 18.0;    // cards and inset groups
-const _radiusSheet = 24.0;   // dialogs and sheets
+/// Radius scale per DESIGN.md: 10 chips, 14 inputs/buttons, 18 cards/groups,
+/// 24 sheets/modals.
+const _radiusSmall = 10.0;
+const _radiusButton = 14.0;
+const _radiusCard = 18.0;
+const _radiusSheet = 24.0;
 
 RoundedRectangleBorder _rounded(double radius) =>
     RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
@@ -135,16 +151,21 @@ class _MyAppState extends State<MyApp> {
 
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
+      initialBinding: AppBindings(),
+      // Wide screens: centered 600px column so the mobile UI never stretches.
+      builder: (context, child) {
+        AppColor.useScheme(Theme.of(context).colorScheme);
+        final body = child ?? const SizedBox.shrink();
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: body,
+          ),
+        );
+      },
       theme: _buildTheme(Brightness.light, _lightDynamic),
       darkTheme: _buildTheme(Brightness.dark, _darkDynamic),
       themeMode: ThemeMode.system,
-      // Runs on every rebuild, before the page tree builds, so AppColor reads
-      // the scheme actually in effect — this is what carries dynamic colour to
-      // every call site without editing any of them.
-      builder: (context, child) {
-        AppColor.useScheme(Theme.of(context).colorScheme);
-        return child ?? const SizedBox.shrink();
-      },
       home: FutureBuilder(
         future: Session.getUser(),
         builder: (context, AsyncSnapshot<User> snapshot) {
@@ -157,7 +178,7 @@ class _MyAppState extends State<MyApp> {
             );
           }
           if (snapshot.data != null && snapshot.data!.idUser != null) {
-            Get.put(CUser()).setData(snapshot.data!);
+            Get.find<CUser>().setData(snapshot.data!);
             return const MainShell();
           }
           return const LoginPage();

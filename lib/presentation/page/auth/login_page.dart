@@ -6,8 +6,6 @@ import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/page/auth/register_page.dart';
 import 'package:cause_money_record/presentation/page/main_shell.dart';
-import 'package:cause_money_record/presentation/widget/aurora_background.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -53,29 +51,16 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: AuroraBackground(
-        child: SafeArea(
+      body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: AppColor.card,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColor.border),
-                    ),
-                    child: Center(
-                      child: Image.asset(AppAsset.logo, width: 44, height: 44),
-                    ),
-                  ),
+                  const _LogoBadge(),
                   const SizedBox(height: 24),
                   Text(
                     'Welcome to svings',
@@ -96,11 +81,16 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 36),
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColor.card,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColor.border),
+                    ),
                     child: Column(
                       children: [
-                        _buildField(
+                        _AuthField(
                           controller: _emailController,
                           label: 'Email',
                           hint: 'name@example.com',
@@ -108,8 +98,8 @@ class _LoginPageState extends State<LoginPage> {
                           type: TextInputType.emailAddress,
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Email is required' : null,
                         ),
-                        const SizedBox(height: 18),
-                        _buildField(
+                        const SizedBox(height: 16),
+                        _AuthField(
                           controller: _passwordController,
                           label: 'Password',
                           hint: 'Enter your password',
@@ -129,35 +119,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Obx(() {
-                    final err = _error.value;
-                    if (err == null) return const SizedBox.shrink();
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppColor.danger.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColor.danger.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline_rounded, color: AppColor.danger, size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              err,
-                              style: TextStyle(
-                                color: AppColor.danger,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                  _ErrorBanner(error: _error),
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -165,8 +127,8 @@ class _LoginPageState extends State<LoginPage> {
                       () => ElevatedButton(
                         onPressed: _loading.value ? null : _login,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColor.primary,
-                          foregroundColor: AppColor.onPrimary,
+                          backgroundColor: AppColor.accent,
+                          foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -177,11 +139,11 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         child: _loading.value
-                            ? SizedBox(
+                            ? const SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                  color: AppColor.onPrimary,
+                                  color: Colors.white,
                                   strokeWidth: 2.5,
                                 ),
                               )
@@ -215,21 +177,96 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         ),
-        ),
       ),
     );
   }
+}
 
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    Widget? suffixIcon,
-    TextInputType? type,
-    String? Function(String?)? validator,
-  }) {
+/// Logo badge: solid matte tile, radius 20.
+class _LogoBadge extends StatelessWidget {
+  const _LogoBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        color: AppColor.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColor.border),
+      ),
+      child: Center(
+        child: Image.asset(AppAsset.logo, width: 44, height: 44),
+      ),
+    );
+  }
+}
+
+/// Inline auth error: reserves no space when null to avoid layout jump.
+class _ErrorBanner extends StatelessWidget {
+  final RxnString error;
+
+  const _ErrorBanner({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final err = error.value;
+      if (err == null) return const SizedBox.shrink();
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColor.danger.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColor.danger.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline_rounded, color: AppColor.danger, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                err,
+                style: TextStyle(
+                  color: AppColor.danger,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+/// DESIGN.md auth input: radius 14, hairline border, accent focus ring.
+class _AuthField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final bool obscure;
+  final Widget? suffixIcon;
+  final TextInputType? type;
+  final String? Function(String?)? validator;
+
+  const _AuthField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.obscure = false,
+    this.suffixIcon,
+    this.type,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -257,23 +294,23 @@ class _LoginPageState extends State<LoginPage> {
             fillColor: AppColor.surface,
             contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.accent, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.danger),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColor.danger, width: 1.5),
             ),
           ),

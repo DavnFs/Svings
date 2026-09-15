@@ -7,8 +7,6 @@ import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
-import 'package:cause_money_record/presentation/widget/liquid_glass.dart';
-import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 /// The home dashboard — today's total, the weekly bar chart, and the monthly
@@ -41,51 +39,54 @@ class HomeBody extends StatelessWidget {
         ]);
       }
       return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          _sectionLabel('Today'),
+          const _SectionHeader(title: 'Today'),
           const SizedBox(height: 8),
-          _todayCard(context, cHome),
-          const SizedBox(height: 28),
-          _sectionLabel('This Week'),
+          _TodayCard(cHome: cHome),
+          const SizedBox(height: 24),
+          const _SectionHeader(title: 'This Week'),
           const SizedBox(height: 8),
-          _weeklyChart(cHome),
-          const SizedBox(height: 28),
-          _sectionLabel('This Month'),
+          _WeeklyChart(cHome: cHome),
+          const SizedBox(height: 24),
+          const _SectionHeader(title: 'This Month'),
           const SizedBox(height: 8),
-          _monthlySection(cHome),
+          _MonthlySection(cHome: cHome),
         ],
       );
     });
   }
+}
 
-  Widget _sectionLabel(String text) => Text(
-        text,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColor.textSecondary,
-          letterSpacing: 0.5,
-        ),
-      );
+/// DESIGN.md section header: 18sp w700.
+class _SectionHeader extends StatelessWidget {
+  final String title;
 
-  Widget _todayCard(BuildContext context, CHome cHome) {
-    // Glass ink on the accent fill: the hero card is a saturated accent plate
-    // so the aurora-fed glass around it has something vivid to answer.
-    final scheme = Theme.of(context).colorScheme;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+    );
+  }
+}
+
+/// Hero summary card: solid accent fill, radius 18, white figures. The one
+/// decorative surface on screen — everything around it stays matte.
+class _TodayCard extends StatelessWidget {
+  final CHome cHome;
+
+  const _TodayCard({required this.cHome});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, scheme.tertiary],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
-        boxShadow: [
-          BoxShadow(color: scheme.primary.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 10)),
-        ],
+        color: AppColor.accent,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Obx(() => Text(
@@ -93,39 +94,41 @@ class HomeBody extends StatelessWidget {
               style: Theme.of(context)
                   .textTheme
                   .headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w700, color: scheme.onPrimary),
+                  ?.copyWith(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 30),
             )),
         const SizedBox(height: 4),
         Obx(() => Text(cHome.todayPercent,
-            style: TextStyle(color: scheme.onPrimary.withValues(alpha: 0.75), fontSize: 13))),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13))),
         const SizedBox(height: 16),
         Obx(() {
           final todayId = cHome.todayId;
           if (todayId == null) return const SizedBox.shrink();
-          return LiquidGlass(
-            radius: 12,
-            blur: 12,
-            tint: Colors.white,
-            alpha: 0.22,
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            child: Pressable(
-              onTap: () => Get.to(() => DetailHistoryPage(idHistory: todayId)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('View Details',
-                    style: TextStyle(color: scheme.onPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: scheme.onPrimary, size: 16),
-              ]),
+          return OutlinedButton.icon(
+            onPressed: () => Get.to(() => DetailHistoryPage(idHistory: todayId)),
+            icon: const Icon(Icons.arrow_forward, size: 16),
+            label: const Text('View Details'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           );
         }),
       ]),
     );
   }
+}
 
-  Widget _weeklyChart(CHome cHome) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
+/// Weekly bars inside a grouped card.
+class _WeeklyChart extends StatelessWidget {
+  final CHome cHome;
+
+  const _WeeklyChart({required this.cHome});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GroupCard(
       child: Obx(() {
         final data = cHome.week;
         final labels = cHome.weekText();
@@ -176,10 +179,17 @@ class HomeBody extends StatelessWidget {
       }),
     );
   }
+}
 
-  Widget _monthlySection(CHome cHome) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
+/// Monthly donut + ledger inside a grouped card.
+class _MonthlySection extends StatelessWidget {
+  final CHome cHome;
+
+  const _MonthlySection({required this.cHome});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GroupCard(
       child: Obx(() {
         if (cHome.monthIncome == 0 && cHome.monthOutcome == 0) {
           return const SizedBox(
@@ -218,9 +228,9 @@ class HomeBody extends StatelessWidget {
             ),
             const SizedBox(width: 24),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _legendItem(AppColor.income, 'Income'),
+              _LegendItem(color: AppColor.income, label: 'Income'),
               const SizedBox(height: 8),
-              _legendItem(AppColor.outcome, 'Expense'),
+              _LegendItem(color: AppColor.outcome, label: 'Expense'),
               const SizedBox(height: 16),
               Text(cHome.monthPercent, style: TextStyle(fontSize: 12, color: AppColor.textSecondary, height: 1.4)),
             ])),
@@ -228,7 +238,11 @@ class HomeBody extends StatelessWidget {
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-            decoration: BoxDecoration(color: AppColor.surface, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColor.border),
+            ),
             child: Row(children: [
               Text('Difference', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
               const Spacer(),
@@ -240,13 +254,43 @@ class HomeBody extends StatelessWidget {
       }),
     );
   }
+}
 
-  Widget _legendItem(Color color, String label) {
+/// Swatch + label for the donut legend.
+class _LegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendItem({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(children: [
       Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
       const SizedBox(width: 8),
       Text(label, style: TextStyle(fontSize: 13, color: AppColor.textSecondary)),
     ]);
+  }
+}
+
+/// DESIGN.md inset grouped surface: single solid matte card, radius 18,
+/// 16dp inner padding, hairline outline. No nested cards, no glass.
+class _GroupCard extends StatelessWidget {
+  final Widget child;
+
+  const _GroupCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColor.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColor.border),
+      ),
+      child: child,
+    );
   }
 }
 

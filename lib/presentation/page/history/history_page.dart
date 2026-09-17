@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_dialog.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/data/model/history.dart';
@@ -30,8 +29,12 @@ class _HistoryPageState extends State<HistoryPage> {
 
 /// The list content of [HistoryPage], extracted so the [MainShell] can embed it
 /// as a tab under a shared [NavigationBar].
+///
+/// [accountId] optionally pre-filters to one account (account card tap).
+/// Null (default) shows every account.
 class HistoryBody extends StatefulWidget {
-  const HistoryBody({super.key});
+  final String? accountId;
+  const HistoryBody({super.key, this.accountId});
 
   @override
   State<HistoryBody> createState() => _HistoryBodyState();
@@ -61,12 +64,23 @@ class _HistoryBodyState extends State<HistoryBody> {
   }
 
   List<History> _getFilteredList(List<History> all) {
-    if (_filter == 'Income') {
-      return all.where((h) => h.type == 'Pemasukan').toList();
-    } else if (_filter == 'Expense') {
-      return all.where((h) => h.type == 'Pengeluaran').toList();
+    var out = all;
+    // Account pre-filter first (account card tap), then the type segment.
+    final accountId = widget.accountId;
+    if (accountId != null) {
+      out = out
+          .where((h) =>
+              h.accountId == accountId || h.transferToAccountId == accountId)
+          .toList();
     }
-    return all;
+    if (_filter == 'Income') {
+      return out.where((h) => h.type == 'Pemasukan').toList();
+    } else if (_filter == 'Expense') {
+      return out.where((h) => h.type == 'Pengeluaran').toList();
+    } else if (_filter == 'Transfer') {
+      return out.where((h) => h.type == 'Transfer').toList();
+    }
+    return out;
   }
 
   @override
@@ -138,11 +152,18 @@ class _HistoryBodyState extends State<HistoryBody> {
                       itemBuilder: (context, index) {
                         final h = filtered[index];
                         final isIncome = h.type == 'Pemasukan';
+                        final isTransfer = h.type == 'Transfer';
+                        // Transfers show no sign (they are not gains/losses)
+                        // and name the direction instead of Income/Expense.
+                        final amount = isTransfer
+                            ? AppFormat.currency(h.total)
+                            : '${isIncome ? '+' : '-'}${AppFormat.currency(h.total)}';
                         return _TransactionRow(
                           scheme: scheme,
                           date: AppFormat.date(h.date),
                           isIncome: isIncome,
-                          amount: '${isIncome ? '+' : '-'}${AppFormat.currency(h.total)}',
+                          isTransfer: isTransfer,
+                          amount: amount,
                           onTap: () => Get.to(() => DetailHistoryPage(idHistory: h.idHistory!)),
                           onDelete: () => _delete(h.idHistory!),
                           deleteLabel: 'Delete transaction on ${AppFormat.date(h.date)}',
@@ -159,7 +180,7 @@ class _HistoryBodyState extends State<HistoryBody> {
   }
 }
 
-/// All/Income/Expense segmented control in a single grouped surface.
+/// All/Income/Expense/Transfer segmented control in a single grouped surface.
 class _FilterSegment extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
@@ -169,18 +190,22 @@ class _FilterSegment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(value: 'All', label: Text('All')),
-        ButtonSegment(value: 'Income', label: Text('Income')),
-        ButtonSegment(value: 'Expense', label: Text('Expense')),
-      ],
-      selected: {value},
-      onSelectionChanged: (s) => onChanged(s.first),
-      showSelectedIcon: false,
-      style: SegmentedButton.styleFrom(
-        selectedForegroundColor: scheme.onSecondaryContainer,
-        selectedBackgroundColor: scheme.secondaryContainer,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(value: 'All', label: Text('All')),
+          ButtonSegment(value: 'Income', label: Text('Income')),
+          ButtonSegment(value: 'Expense', label: Text('Expense')),
+          ButtonSegment(value: 'Transfer', label: Text('Transfer')),
+        ],
+        selected: {value},
+        onSelectionChanged: (s) => onChanged(s.first),
+        showSelectedIcon: false,
+        style: SegmentedButton.styleFrom(
+          selectedForegroundColor: scheme.onSecondaryContainer,
+          selectedBackgroundColor: scheme.secondaryContainer,
+        ),
       ),
     );
   }
@@ -219,10 +244,12 @@ class _GroupedList extends StatelessWidget {
 }
 
 /// One transaction row: status icon, date + type, signed amount, delete.
+/// Transfers render a swap icon and no sign.
 class _TransactionRow extends StatelessWidget {
   final ColorScheme scheme;
   final String date;
   final bool isIncome;
+  final bool isTransfer;
   final String amount;
   final VoidCallback onTap;
   final VoidCallback onDelete;
@@ -232,6 +259,7 @@ class _TransactionRow extends StatelessWidget {
     required this.scheme,
     required this.date,
     required this.isIncome,
+    this.isTransfer = false,
     required this.amount,
     required this.onTap,
     required this.onDelete,
@@ -240,7 +268,14 @@ class _TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = isIncome ? AppColor.income : AppColor.outcome;
+    final status = isTransfer
+        ? scheme.primary
+        : (isIncome ? scheme.tertiary : scheme.error);
+    final icon = isTransfer
+        ? Icons.swap_horiz_rounded
+        : (isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
+    final kindLabel =
+        isTransfer ? 'Transfer' : (isIncome ? 'Income' : 'Expense');
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -254,11 +289,7 @@ class _TransactionRow extends StatelessWidget {
                 color: status.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                color: status,
-                size: 18,
-              ),
+              child: Icon(icon, color: status, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -275,7 +306,7 @@ class _TransactionRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isIncome ? 'Income' : 'Expense',
+                    kindLabel,
                     style: TextStyle(
                       color: status,
                       fontSize: 12,
@@ -289,7 +320,7 @@ class _TransactionRow extends StatelessWidget {
               amount,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: isIncome ? status : scheme.onSurface,
+                color: isTransfer ? scheme.onSurface : (isIncome ? status : scheme.onSurface),
                 fontSize: 15,
               ),
             ),

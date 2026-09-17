@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cause_money_record/data/email/email_sync.dart';
+import 'package:cause_money_record/data/email/email_transaction_parser.dart';
 import 'package:cause_money_record/data/model/fetched_email.dart';
 
 /// The sync pipeline is the part that decides whether an email becomes a
@@ -121,6 +122,109 @@ void main() {
       final outcome = await sync.sync([]);
       expect(outcome.isEmpty, isTrue);
       expect(outcome.candidates, isEmpty);
+    });
+  });
+
+  group('sender mapping', () {
+    FetchedEmail from(String sender, String body) => FetchedEmail(
+          messageId: 'm-${sender.hashCode}',
+          body: body,
+          receivedAt: DateTime(2026, 9, 14),
+          sender: sender,
+          subject: 'Notifikasi Transaksi',
+        );
+
+    test('mapped sender resolves to its account', () async {
+      final sync = EmailSync(
+        store: (m) async => 'row-1',
+        mark: (id, {error}) async {},
+        accountForSender: (s) =>
+            s == 'noreply@bca.co.id' ? 'acc-bca' : null,
+      );
+
+      final outcome =
+          await sync.sync([from('noreply@bca.co.id', parseable)]);
+
+      expect(outcome.candidates.single.accountId, 'acc-bca');
+    });
+
+    test('unmapped sender stays null so the caller can use Lainnya', () async {
+      final sync = EmailSync(
+        store: (m) async => 'row-2',
+        mark: (id, {error}) async {},
+        accountForSender: (_) => null,
+      );
+
+      final outcome = await sync.sync([from('unknown@x.co.id', parseable)]);
+
+      expect(outcome.candidates.single.accountId, isNull);
+    });
+
+    test('a throwing resolver never breaks the sync', () async {
+      final sync = EmailSync(
+        store: (m) async => 'row-3',
+        mark: (id, {error}) async {},
+        accountForSender: (_) => throw Exception('prefs corrupt'),
+      );
+
+      final outcome = await sync.sync([from('a@b.co', parseable)]);
+
+      expect(outcome.candidates.single.accountId, isNull);
+    });
+  });
+
+  group('transfer detection', () {
+    test('same-day same-amount opposite entry flags a possible transfer', () async {
+      final sync = EmailSync(
+        store: (m) async => 'row-new',
+        mark: (id, {error}) async {},
+        recentEmailTransactions: () async => [
+          const TransferMatchRow(
+            id: 'old-out',
+            date: '2026-09-14',
+            total: 25000,
+            type: 'Pengeluaran',
+            accountId: 'acc-bca',
+          ),
+        ],
+      );
+
+      // parseable fixture is an expense of 25000 on 14/09/2026... the detector
+      // needs an INCOME to pair with the stored expense, so the counter-entry
+      // below uses an income word ('masuk') the parser recognizes.
+      final incoming = EmailTransactionParser.parse(
+          'Dana masuk sebesar Rp 25.000 pada 14/09/2026 berhasil.',
+          receivedAt: DateTime(2026, 9, 14))!;
+      expect(incoming.type, 'Pemasukan');
+
+      final outcome = await sync.sync([
+        FetchedEmail(
+          messageId: 'm-in',
+          // Same amount as the stored expense, income direction.
+          body: 'Dana masuk sebesar Rp 25.000 pada 14/09/2026 berhasil.',
+          receivedAt: DateTime(2026, 9, 14),
+          sender: 'gopay@gojek.com',
+          subject: 'Dana masuk',
+        ),
+      ]);
+
+      expect(outcome.candidates, hasLength(1));
+      expect(outcome.candidates.single.possibleTransferWith, 'old-out');
+    });
+
+    test('no match, no flag — and rows are never merged', () async {
+      final sync = EmailSync(
+        store: (m) async => 'row-x',
+        mark: (id, {error}) async {},
+        recentEmailTransactions: () async => const [],
+      );
+
+      final outcome = await sync.sync([mail('mx', parseable)]);
+
+      // Still a plain candidate: the detector only flags, never merges or
+      // drops.
+      expect(outcome.candidates, hasLength(1));
+      expect(outcome.candidates.single.possibleTransferWith, isNull);
     });
   });
 

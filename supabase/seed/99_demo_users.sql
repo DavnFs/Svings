@@ -61,6 +61,10 @@ end $$;
 
 -- 3. Sample transactions so the home screen has data on first login.
 --    Mix of income (allowance, freelance) and expense (food, transport, etc.)
+--
+--    Accounts: each demo user gets "Cash" + "Bank", all transactions tagged.
+--    The accounts migration backfills real users to "Lainnya"; the seed creates
+--    named accounts directly so the demo shows the multi-account UI.
 do $$
 declare
   v_user1_id uuid := '99999999-9999-9999-9999-999999999901';
@@ -68,60 +72,74 @@ declare
   v_today date := current_date;
   v_d date;
   v_items jsonb;
+  v_cash1 uuid;
+  v_bank1 uuid;
+  v_cash2 uuid;
+  v_bank2 uuid;
 begin
   -- Wipe existing demo transactions (idempotent)
   delete from public.transactions where user_id in (v_user1_id, v_user2_id);
+  delete from public.accounts where user_id in (v_user1_id, v_user2_id);
+
+  insert into public.accounts (user_id, name, kind, icon, color)
+    values (v_user1_id, 'Cash', 'cash', '💵', '#059669') returning id into v_cash1;
+  insert into public.accounts (user_id, name, kind, icon, color)
+    values (v_user1_id, 'Bank', 'bank', '🏦', '#0284C7') returning id into v_bank1;
+  insert into public.accounts (user_id, name, kind, icon, color)
+    values (v_user2_id, 'Cash', 'cash', '💵', '#059669') returning id into v_cash2;
+  insert into public.accounts (user_id, name, kind, icon, color)
+    values (v_user2_id, 'Bank', 'bank', '🏦', '#0284C7') returning id into v_bank2;
 
   -- User 1: Ahmad Fauzan - 30 days of realistic transactions
   for i in 0..29 loop
     v_d := v_today - i;
 
-    -- expense: daily food (mostly)
+    -- expense: daily food (mostly), paid in cash
     if i % 3 <> 0 then
       v_items := jsonb_build_array(
         jsonb_build_object('name','Nasi + Lauk','price', (15000 + (random()*5000)::int)::text),
         jsonb_build_object('name','Es Teh/Air Mineral','price', (3000 + (random()*2000)::int)::text)
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user1_id, 'expense', v_d,
+        v_user1_id, v_cash1, 'expense', v_d,
         (select sum((x->>'price')::numeric) from jsonb_array_elements(v_items) x),
         v_items, 'Makan siang/kampus'
       );
     end if;
 
-    -- expense: transport every other day
+    -- expense: transport every other day, paid in cash
     if i % 2 = 0 then
       v_items := jsonb_build_array(
         jsonb_build_object('name','Bensin/Transport','price', (10000 + (random()*10000)::int)::text)
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user1_id, 'expense', v_d,
+        v_user1_id, v_cash1, 'expense', v_d,
         (select sum((x->>'price')::numeric) from jsonb_array_elements(v_items) x),
         v_items, 'Transport kampus'
       );
     end if;
 
-    -- income: monthly allowance (1st of month)
+    -- income: monthly allowance (1st of month), lands in the bank
     if extract(day from v_d) = 1 then
       v_items := jsonb_build_array(
         jsonb_build_object('name','Uang Saku Bulanan','price', '1500000')
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user1_id, 'income', v_d, 1500000, v_items, 'Uang saku dari orang tua'
+        v_user1_id, v_bank1, 'income', v_d, 1500000, v_items, 'Uang saku dari orang tua'
       );
     end if;
 
-    -- income: freelance project every 10 days
+    -- income: freelance project every 10 days, lands in the bank
     if i % 10 = 5 then
       v_items := jsonb_build_array(
         jsonb_build_object('name','Freelance Web Project','price', (300000 + (random()*500000)::int)::text)
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user1_id, 'income', v_d,
+        v_user1_id, v_bank1, 'income', v_d,
         (select sum((x->>'price')::numeric) from jsonb_array_elements(v_items) x),
         v_items, 'Project freelance'
       );
@@ -137,9 +155,9 @@ begin
         jsonb_build_object('name','Kopi & Snack','price', (12000 + (random()*8000)::int)::text),
         jsonb_build_object('name','Makan Siang','price', (18000 + (random()*7000)::int)::text)
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user2_id, 'expense', v_d,
+        v_user2_id, v_cash2, 'expense', v_d,
         (select sum((x->>'price')::numeric) from jsonb_array_elements(v_items) x),
         v_items, 'Jajan & makan'
       );
@@ -149,9 +167,9 @@ begin
       v_items := jsonb_build_array(
         jsonb_build_object('name','Uang Saku','price', '2000000')
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user2_id, 'income', v_d, 2000000, v_items, 'Transfer dari ortu'
+        v_user2_id, v_bank2, 'income', v_d, 2000000, v_items, 'Transfer dari ortu'
       );
     end if;
 
@@ -159,9 +177,9 @@ begin
       v_items := jsonb_build_array(
         jsonb_build_object('name','Part-time Tutor','price', '150000')
       );
-      insert into public.transactions (user_id, type, date, total, items, notes)
+      insert into public.transactions (user_id, account_id, type, date, total, items, notes)
       values (
-        v_user2_id, 'income', v_d, 150000, v_items, 'Les privat'
+        v_user2_id, v_bank2, 'income', v_d, 150000, v_items, 'Les privat'
       );
     end if;
   end loop;

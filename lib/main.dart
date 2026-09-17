@@ -7,13 +7,13 @@ import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/config/supabase_config.dart';
 import 'package:cause_money_record/data/model/user.dart';
+import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_settings.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
-import 'package:cause_money_record/presentation/controller/history/c_income_outcome.dart';
 import 'package:cause_money_record/presentation/page/auth/login_page.dart';
 import 'package:cause_money_record/presentation/page/main_shell.dart';
 import 'package:cause_money_record/presentation/widget/app_lock.dart';
@@ -25,8 +25,8 @@ class AppBindings extends Bindings {
   void dependencies() {
     Get.put(CUser(), permanent: true);
     Get.put(CHome(), permanent: true);
+    Get.put(CAccounts(), permanent: true);
     Get.put(CHistory(), permanent: true);
-    Get.put(CIncomeOutcome(), permanent: true);
     Get.put(CDetailHistory(), permanent: true);
     Get.put(CHistoryForm(), permanent: true);
     Get.put(CSettings(), permanent: true);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_format.dart';
+import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/history/c_detail_history.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
@@ -71,18 +72,31 @@ class _DetailView extends StatelessWidget {
         );
       }
       final isIncome = d.type == 'Pemasukan';
+      final isTransfer = d.type == 'Transfer';
       final items = d.items;
-      final status = isIncome ? scheme.tertiary : scheme.error;
+      final status = isTransfer
+          ? scheme.primary
+          : (isIncome ? scheme.tertiary : scheme.error);
+      final accounts = Get.find<CAccounts>();
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           _HeroCard(
             total: AppFormat.currency(d.total),
             isIncome: isIncome,
+            isTransfer: isTransfer,
             status: status,
             date: AppFormat.date(d.date),
             notes: d.notes,
           ),
+          // Transfers name both legs; income/expense name their account.
+          if (isTransfer)
+            _TransferLegs(
+              from: accounts.byId(d.accountId)?.name,
+              to: accounts.byId(d.transferToAccountId)?.name,
+            )
+          else if (d.accountId != null)
+            _AccountLine(name: accounts.byId(d.accountId)?.name),
           const SizedBox(height: 24),
           Text(
             'Items Breakdown (${items.length})',
@@ -101,10 +115,66 @@ class _DetailView extends StatelessWidget {
   }
 }
 
+/// Transfer legs: source -> destination. Unknown (deleted) accounts render
+/// as '—' rather than crashing.
+class _TransferLegs extends StatelessWidget {
+  final String? from;
+  final String? to;
+
+  const _TransferLegs({required this.from, required this.to});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Card.outlined(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: scheme.surfaceContainerLow,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            const Icon(Icons.swap_horiz_rounded),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('${from ?? '—'}  →  ${to ?? '—'}',
+                  style: TextStyle(fontSize: 14, color: scheme.onSurface)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Owning account line for income/expense.
+class _AccountLine extends StatelessWidget {
+  final String? name;
+
+  const _AccountLine({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(children: [
+        Icon(Icons.account_balance_wallet_outlined,
+            size: 16, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Text(name ?? '—',
+            style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+      ]),
+    );
+  }
+}
+
 /// Hero summary: status icon, total, type chip, date, notes.
 class _HeroCard extends StatelessWidget {
   final String total;
   final bool isIncome;
+  final bool isTransfer;
   final Color status;
   final String date;
   final String? notes;
@@ -112,6 +182,7 @@ class _HeroCard extends StatelessWidget {
   const _HeroCard({
     required this.total,
     required this.isIncome,
+    this.isTransfer = false,
     required this.status,
     required this.date,
     required this.notes,
@@ -136,9 +207,11 @@ class _HeroCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
-                isIncome
-                    ? Icons.arrow_downward_rounded
-                    : Icons.arrow_upward_rounded,
+                isTransfer
+                    ? Icons.swap_horiz_rounded
+                    : (isIncome
+                        ? Icons.arrow_downward_rounded
+                        : Icons.arrow_upward_rounded),
                 color: status,
                 size: 24,
               ),
@@ -153,7 +226,9 @@ class _HeroCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Chip(
-              label: Text(isIncome ? 'Income' : 'Expense'),
+              label: Text(isTransfer
+                  ? 'Transfer'
+                  : (isIncome ? 'Income' : 'Expense')),
               backgroundColor: status.withValues(alpha: 0.12),
               labelStyle: TextStyle(
                 color: status,

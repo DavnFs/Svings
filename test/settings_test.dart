@@ -72,17 +72,12 @@ void main() {
       ),
     );
 
-    // Tapping Expense reports index 2 back to the shell, which drives the
-    // IndexedStack — the same index contract the MainTab enum pins.
-    await tester.tap(find.text('Expense'));
+    // Tapping Transactions reports index 1 back to the shell, which drives
+    // the IndexedStack — the same index contract the MainTab enum pins.
+    await tester.tap(find.text('Transactions'));
     await tester.pumpAndSettle();
-    expect(selected, MainTab.expense);
-    expect(selected.index, 2);
-
-    await tester.tap(find.text('History'));
-    await tester.pumpAndSettle();
-    expect(selected, MainTab.history);
-    expect(selected.index, 3);
+    expect(selected, MainTab.transactions);
+    expect(selected.index, 1);
   });
 
   test('destructive reset is double-gated', () {

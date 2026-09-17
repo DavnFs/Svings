@@ -16,6 +16,16 @@ class CHistoryForm extends GetxController {
   String get type => _type.value;
   setType(String n) => _type.value = n;
 
+  /// Owning account for income/expense; SOURCE for transfers.
+  final _accountId = RxnString();
+  String? get accountId => _accountId.value;
+  setAccountId(String? id) => _accountId.value = id;
+
+  /// DESTINATION for transfers; null otherwise.
+  final _transferToAccountId = RxnString();
+  String? get transferToAccountId => _transferToAccountId.value;
+  setTransferToAccountId(String? id) => _transferToAccountId.value = id;
+
   final _items = <HistoryItem>[].obs;
   List<HistoryItem> get items => _items;
 
@@ -39,6 +49,8 @@ class CHistoryForm extends GetxController {
     _total.value = 0;
     _date.value = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _type.value = 'Pemasukan';
+    _accountId.value = null;
+    _transferToAccountId.value = null;
   }
 
   void _recalculate() {
@@ -55,6 +67,8 @@ class CHistoryForm extends GetxController {
     if (history == null) return;
     setDate(history.date);
     setType(history.type);
+    setAccountId(history.accountId);
+    setTransferToAccountId(history.transferToAccountId);
     _items.assignAll(history.items);
     _recalculate();
   }

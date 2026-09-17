@@ -28,7 +28,9 @@ class SourceHistory {
       final lastOfMonth = DateFormat('yyyy-MM-dd')
           .format(DateTime(now.year, now.month + 1, 0));
 
-      // Today expense (id retained so the dashboard can link to the entry)
+      // Today expense (id retained so the dashboard can link to the entry).
+      // Transfers excluded: they move money between accounts, they are not
+      // spending. Same exclusion in the week + month queries below.
       final todayResp = await _client
           .from('transactions')
           .select('id, total')
@@ -69,11 +71,12 @@ class SourceHistory {
         return byDate[d] ?? 0.0;
       });
 
-      // This month income + expense
+      // This month income + expense. Transfers excluded (see above).
       final monthResp = await _client
           .from('transactions')
           .select('type, total')
           .eq('user_id', idUser)
+          .inFilter('type', ['income', 'expense'])
           .gte('date', firstOfMonth)
           .lte('date', lastOfMonth);
       double income = 0, outcome = 0;
@@ -105,26 +108,33 @@ class SourceHistory {
   }
 
   /// Add a new transaction. `idUser` is the auth user id.
+  ///
+  /// For transfers, [type] is 'Transfer', [accountId] is the SOURCE and
+  /// [transferToAccountId] the DESTINATION.
   static Future<bool> add({
     required String idUser,
     required String date,
-    required String type,         // 'Pemasukan' or 'Pengeluaran'
+    required String type,         // 'Pemasukan' | 'Pengeluaran' | 'Transfer'
     required List<HistoryItem> items,
     String? notes,
     String source = 'manual',     // 'manual' | 'email'
     String? rawEmailId,
+    String? accountId,
+    String? transferToAccountId,
   }) async {
     final total = items.fold<double>(0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
     try {
       await _client.from('transactions').insert({
         'user_id': idUser,
-        'type': type == 'Pemasukan' ? 'income' : 'expense',
+        'type': History.typeToDb(type),
         'date': date,
         'total': total,
         'notes': notes,
         'items': items.map((e) => e.toJson()).toList(),
         'source': source,
         'raw_email_id': rawEmailId,
+        'account_id': accountId,
+        'transfer_to_account_id': transferToAccountId,
       });
       return true;
     } catch (_) {
@@ -132,7 +142,8 @@ class SourceHistory {
     }
   }
 
-  /// Update an existing transaction.
+  /// Update an existing transaction. Transfer legs can be edited like the
+  /// rest; pass the same account fields as [add].
   static Future<bool> update({
     required String idHistory,
     required String idUser,
@@ -140,15 +151,19 @@ class SourceHistory {
     required String type,
     required List<HistoryItem> items,
     String? notes,
+    String? accountId,
+    String? transferToAccountId,
   }) async {
     final total = items.fold<double>(0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
     try {
       await _client.from('transactions').update({
         'date': date,
-        'type': type == 'Pemasukan' ? 'income' : 'expense',
+        'type': History.typeToDb(type),
         'total': total,
         'notes': notes,
         'items': items.map((e) => e.toJson()).toList(),
+        'account_id': accountId,
+        'transfer_to_account_id': transferToAccountId,
       }).eq('id', idHistory).eq('user_id', idUser);
       return true;
     } catch (_) {
@@ -197,6 +212,71 @@ class SourceHistory {
     }
   }
 
+  /// Confirmed email transactions for transfer-pair matching: same-day,
+  /// same-amount, opposite-direction candidates. Only id/date/total/type are
+  /// read — no bodies, no tokens.
+  static Future<List<Map<String, dynamic>>> emailTransferRows(String idUser,
+      {int limit = 50}) async {
+    try {
+      final resp = await _client
+          .from('transactions')
+          .select('id, date, total, type, account_id')
+          .eq('user_id', idUser)
+          .eq('source', 'email')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return (resp as List).map((e) {
+        final m = e as Map<String, dynamic>;
+        return {
+          'id': m['id'].toString(),
+          'date': (m['date'] as String).split('T').first,
+          'total': (m['total'] as num).toDouble(),
+          'type': History.typeFromDb(m['type'] as String?),
+          'accountId': m['account_id']?.toString(),
+        };
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Reassigns an auto-imported transaction to another account (Recent
+  /// auto-imports log). Type and legs untouched — just the owning account.
+  static Future<bool> reassignAccount(String idHistory, String accountId) async {
+    try {
+      await _client
+          .from('transactions')
+          .update({'account_id': accountId})
+          .eq('id', idHistory);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Merges an income + expense pair into one transfer, user-confirmed only.
+  /// Keeps the OUTGOING row as the transfer (source -> destination) and
+  /// deletes the incoming row, so history loses nothing silently: exactly one
+  /// row changes type, one row disappears, both by explicit user action.
+  static Future<bool> mergeAsTransfer({
+    required String outgoingId,
+    required String incomingId,
+    required String fromAccountId,
+    required String toAccountId,
+  }) async {
+    try {
+      await _client.from('transactions').update({
+        'type': 'transfer',
+        'account_id': fromAccountId,
+        'transfer_to_account_id': toAccountId,
+      }).eq('id', outgoingId);
+      await _client.from('transactions').delete().eq('id', incomingId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Fetch all transactions for a user, newest first.
   static Future<List<History>> history(String idUser) async {
     try {
@@ -234,9 +314,10 @@ class SourceHistory {
     }
   }
 
-  /// Fetch transactions filtered by type ('Pemasukan' or 'Pengeluaran').
+  /// Fetch transactions filtered by type ('Pemasukan', 'Pengeluaran', or
+  /// 'Transfer'). 'Transfer' is a real db type now, not derived.
   static Future<List<History>> incomeOutcome(String idUser, String type) async {
-    final dbType = type == 'Pemasukan' ? 'income' : 'expense';
+    final dbType = History.typeToDb(type);
     try {
       final resp = await _client
           .from('transactions')

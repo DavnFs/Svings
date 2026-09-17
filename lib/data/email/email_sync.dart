@@ -18,11 +18,22 @@ class EmailCandidate {
   final String? subject;
   final ParsedTransaction transaction;
 
+  /// Account id resolved from the sender mapping, if any. Null = unmapped:
+  /// the caller assigns the default account and flags the row for review.
+  final String? accountId;
+
+  /// Heuristic only: same-day, same-amount counter-entry among the confirmed
+  /// email transactions, suggesting this pair is one transfer. The UI shows it
+  /// as "possible transfer" for the user to confirm/merge — never auto-merged.
+  final String? possibleTransferWith;
+
   const EmailCandidate({
     required this.rawEmailId,
     required this.transaction,
     this.sender,
     this.subject,
+    this.accountId,
+    this.possibleTransferWith,
   });
 }
 
@@ -57,6 +68,23 @@ class SyncOutcome {
       'unparseable: $unparseable, failed: $failed, candidates: ${candidates.length})';
 }
 
+/// One confirmed email transaction, for transfer-pair matching.
+class TransferMatchRow {
+  final String id;
+  final String date;
+  final double total;
+  final String type;
+  final String? accountId;
+
+  const TransferMatchRow({
+    required this.id,
+    required this.date,
+    required this.total,
+    required this.type,
+    this.accountId,
+  });
+}
+
 /// Turns fetched emails into candidate transactions.
 ///
 /// Per message: store first, then parse. Storing first means nothing is lost if
@@ -79,17 +107,29 @@ class EmailSync {
   /// silently stalling. Null in tests.
   final Future<void> Function(int consecutive)? _onRateLimit;
 
+  /// Sender -> account id resolver from Settings. Null in tests (every
+  /// candidate unmapped). Never throws: mapping is best-effort.
+  final String? Function(String? sender)? _accountForSender;
+
+  /// Confirmed email transactions to match against for transfer detection.
+  /// Each entry: (id, date yyyy-MM-dd, total, type, accountId). Null in tests.
+  final Future<List<TransferMatchRow>> Function()? _recentEmailTransactions;
+
   EmailSync({
     EmailStore? store,
     ParseMarker? mark,
     UnparsedLoader? loadUnparsed,
     Future<LlmResult> Function(String body, {DateTime? receivedAt})? llm,
     Future<void> Function(int consecutive)? onRateLimit,
+    String? Function(String? sender)? accountForSender,
+    Future<List<TransferMatchRow>> Function()? recentEmailTransactions,
   })  : _store = store ?? SourceEmail.store,
         _mark = mark ?? SourceEmail.markParsed,
         _loadUnparsed = loadUnparsed ?? SourceEmail.unparsed,
         _llm = llm,
-        _onRateLimit = onRateLimit;
+        _onRateLimit = onRateLimit,
+        _accountForSender = accountForSender,
+        _recentEmailTransactions = recentEmailTransactions;
 
   Future<SyncOutcome> sync(List<FetchedEmail> messages) async {
     var stored = 0;
@@ -180,6 +220,13 @@ class EmailSync {
     String? sender,
     String? subject,
   }) async {
+    String? accountId;
+    try {
+      accountId = _accountForSender?.call(sender);
+    } catch (_) {
+      accountId = null;
+    }
+
     final parsed = EmailTransactionParser.parse(body, receivedAt: receivedAt);
 
     if (parsed == null && _llm != null) {
@@ -192,12 +239,13 @@ class EmailSync {
       if (fallback.transaction != null) {
         await _tryMark(rawEmailId);
         return (
-          EmailCandidate(
+          await _withTransferHint(EmailCandidate(
             rawEmailId: rawEmailId,
             sender: sender,
             subject: subject,
             transaction: fallback.transaction!,
-          ),
+            accountId: accountId,
+          )),
           false,
         );
       }
@@ -214,14 +262,49 @@ class EmailSync {
 
     await _tryMark(rawEmailId);
     return (
-      EmailCandidate(
+      await _withTransferHint(EmailCandidate(
         rawEmailId: rawEmailId,
         sender: sender,
         subject: subject,
         transaction: parsed,
-      ),
+        accountId: accountId,
+      )),
       false,
     );
+  }
+
+  /// Flags a possible transfer pair WITHOUT merging: same-day, same-amount,
+  /// opposite-direction confirmed email transaction on a different account.
+  /// Coincidental matches stay as two separate entries until the user confirms.
+  Future<EmailCandidate> _withTransferHint(EmailCandidate c) async {
+    final loader = _recentEmailTransactions;
+    if (loader == null) return c;
+    List<TransferMatchRow> rows;
+    try {
+      rows = await loader();
+    } catch (_) {
+      return c;
+    }
+    final day =
+        '${c.transaction.date.year}-${c.transaction.date.month.toString().padLeft(2, '0')}-${c.transaction.date.day.toString().padLeft(2, '0')}';
+    final wantType =
+        c.transaction.type == 'Pemasukan' ? 'Pengeluaran' : 'Pemasukan';
+    for (final r in rows) {
+      if (r.date == day &&
+          r.total == c.transaction.total &&
+          r.type == wantType &&
+          r.accountId != c.accountId) {
+        return EmailCandidate(
+          rawEmailId: c.rawEmailId,
+          sender: c.sender,
+          subject: c.subject,
+          transaction: c.transaction,
+          accountId: c.accountId,
+          possibleTransferWith: r.id,
+        );
+      }
+    }
+    return c;
   }
 
   /// Marking is bookkeeping. A failure there must not lose the candidate.

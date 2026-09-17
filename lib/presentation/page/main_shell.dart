@@ -4,19 +4,19 @@ import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_asset.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
+import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/auth/login_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_form_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
-import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
 import 'package:cause_money_record/presentation/page/settings_page.dart';
 import 'package:cause_money_record/presentation/widget/floating_nav_bar.dart';
 
-/// Primary navigation shell: a Google Photos-style floating MD3 nav pill on
-/// the bottom edge, four tabs in an IndexedStack, and a standard FAB for the
-/// primary "new entry" action.
+/// Primary navigation shell: Home + Transactions in an IndexedStack under a
+/// floating MD3 nav pill, and a standard FAB for the primary "new entry"
+/// action.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -29,19 +29,25 @@ class _MainShellState extends State<MainShell> {
 
   late final CUser cUser;
   late final CHome cHome;
+  late final CAccounts cAccounts;
 
   @override
   void initState() {
     super.initState();
     cUser = Get.find<CUser>();
     cHome = Get.find<CHome>();
-    if (cUser.id.isNotEmpty) cHome.getAnalysis(cUser.id);
+    cAccounts = Get.find<CAccounts>();
+    _refresh();
   }
 
   Future<void> _refresh() async {
     final id = cUser.id;
     if (id.isEmpty) return;
     await cHome.getAnalysis(id);
+    // Balances feed the hero card via the same pass — stale totals after a
+    // save are the bug this second call prevents.
+    await cAccounts.getAccounts(id);
+    cHome.totalBalance = cAccounts.total;
   }
 
   void _selectTab(int i) => setState(() => _tab = MainTab.values[i]);
@@ -75,8 +81,6 @@ class _MainShellState extends State<MainShell> {
               index: _tab.index,
               children: const [
                 _TabPage(child: HomeBody()),
-                _TabPage(child: IncomeOutcomeBody(type: 'Pemasukan')),
-                _TabPage(child: IncomeOutcomeBody(type: 'Pengeluaran')),
                 _TabPage(child: HistoryBody()),
               ],
             ),

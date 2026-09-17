@@ -35,6 +35,13 @@ class CHome extends GetxController {
   final _differentMonth = 0.0.obs;
   double get differentMonth => _differentMonth.value;
 
+  /// Aggregate balance across all accounts. Set by Home from CAccounts —
+  /// kept here (not read from CAccounts in the widget) so the Today card's
+  /// existing Obx wiring keeps working unchanged.
+  final _totalBalance = 0.0.obs;
+  double get totalBalance => _totalBalance.value;
+  set totalBalance(double v) => _totalBalance.value = v;
+
   static const _dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
   List<String> weekText() {

@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// The four tabs, in display order. Single source of truth: MainShell builds
+/// The two tabs, in display order. Single source of truth: MainShell builds
 /// its IndexedStack pages in [MainTab.values] order and passes the selected
 /// tab's index to the nav bar, so render order and highlight can never drift
-/// apart (that drift was a real shipped bug: Expense highlighted between Home
-/// and Income, History highlighted Income).
+/// apart. (Income/Expense used to be tabs; they are now filters inside the
+/// Transactions screen — see HistoryBody.)
 enum MainTab {
   home('Home', Icons.home_outlined, Icons.home, 'Home'),
-  income('Income', Icons.arrow_downward_rounded, Icons.south_rounded, 'Income records'),
-  expense('Expense', Icons.arrow_upward_rounded, Icons.north_rounded, 'Expense records'),
-  history('History', Icons.receipt_long_outlined, Icons.receipt_long, 'Transaction history');
+  transactions('Transactions', Icons.receipt_long_outlined, Icons.receipt_long,
+      'Transaction history');
 
   final String label;
   final IconData icon;

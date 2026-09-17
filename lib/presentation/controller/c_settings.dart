@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
@@ -29,6 +31,7 @@ class CSettings extends GetxController {
   static const _kModel = 'settings.llm_model';
   static const _kLastSync = 'settings.last_sync_ms';
   static const _kRateHits = 'settings.llm_429_hits';
+  static const _kSenderMap = 'settings.sender_account_map'; // JSON {sender: accountId}
 
   static const _kApiKey = 'settings.groq_api_key';
   static const defaultModel = 'llama-3.1-8b-instant';
@@ -74,6 +77,26 @@ class CSettings extends GetxController {
   int get rateHits => _rateHits.value;
   bool get rateLimited => _rateHits.value >= 3;
 
+  /// Sender -> account id mapping for auto-imports. Keys are lowercased sender
+  /// strings (email or domain fragment). Unmapped senders fall back to the
+  /// default account — never guessed.
+  final _senderMap = <String, String>{}.obs;
+  Map<String, String> get senderMap => Map.unmodifiable(_senderMap);
+
+  /// Longest-match lookup: 'noreply@bca.co.id' beats 'bca.co.id'.
+  String? accountForSender(String? sender) {
+    if (sender == null || _senderMap.isEmpty) return null;
+    final s = sender.toLowerCase();
+    String? best;
+    for (final entry in _senderMap.entries) {
+      if (s.contains(entry.key) &&
+          (best == null || entry.key.length > best.length)) {
+        best = entry.key;
+      }
+    }
+    return best == null ? null : _senderMap[best];
+  }
+
   bool get loaded => _prefs.value != null;
 
   Future<void> load() async {
@@ -92,6 +115,16 @@ class CSettings extends GetxController {
     final ms = prefs.getInt(_kLastSync);
     _lastSync.value = ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
     _rateHits.value = prefs.getInt(_kRateHits) ?? 0;
+    try {
+      final raw = prefs.getString(_kSenderMap);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        _senderMap.assignAll(
+            decoded.map((k, v) => MapEntry(k.toString().toLowerCase(), v.toString())));
+      }
+    } catch (_) {
+      // Corrupt map: start empty rather than crash settings load.
+    }
     final key = await _store.readKey(_kApiKey);
     _apiKeyTail.value = key == null || key.length < 4 ? '' : key.substring(key.length - 4);
   }
@@ -164,5 +197,21 @@ class CSettings extends GetxController {
   Future<void> clearRateHits() async {
     _rateHits.value = 0;
     await _prefs.value?.setInt(_kRateHits, 0);
+  }
+
+  Future<void> setSenderMapping(String sender, String? accountId) async {
+    final key = sender.trim().toLowerCase();
+    if (key.isEmpty) return;
+    if (accountId == null) {
+      _senderMap.remove(key);
+    } else {
+      _senderMap[key] = accountId;
+    }
+    await _prefs.value?.setString(_kSenderMap, jsonEncode(_senderMap));
+  }
+
+  Future<void> clearSenderMap() async {
+    _senderMap.clear();
+    await _prefs.value?.remove(_kSenderMap);
   }
 }

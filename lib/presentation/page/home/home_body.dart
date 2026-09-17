@@ -3,9 +3,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_format.dart';
+import 'package:cause_money_record/data/model/account.dart';
+import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
+import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 /// The home dashboard — today's total, the weekly bar chart, and the monthly
@@ -17,9 +20,13 @@ class HomeBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cHome = Get.find<CHome>();
+    final cAccounts = Get.find<CAccounts>();
 
+    // No fetching here: MainShell._refresh owns both loads (analysis +
+    // accounts) so pull-to-refresh and post-save refresh hit both.
     return Obx(() {
-      if (cHome.loading && cHome.today == 0) {
+      if ((cHome.loading && cHome.today == 0) ||
+          (cAccounts.loading && cAccounts.accounts.isEmpty)) {
         return ListView(children: const [
           SizedBox(height: 80),
           StateView(
@@ -44,9 +51,13 @@ class HomeBody extends StatelessWidget {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
-          const _SectionHeader(title: 'Today'),
+          const _SectionHeader(title: 'Total Balance'),
           const SizedBox(height: 8),
           _TodayCard(cHome: cHome),
+          const SizedBox(height: 24),
+          const _SectionHeader(title: 'Sumber Dana'),
+          const SizedBox(height: 8),
+          _AccountRow(cAccounts: cAccounts),
           const SizedBox(height: 24),
           const _SectionHeader(title: 'This Week'),
           const SizedBox(height: 8),
@@ -78,8 +89,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Hero summary card: primary-container tonal fill, on-primary-container
-/// figures. No shadows — depth comes from tone.
+/// Hero summary card: aggregate balance across all accounts, with today's
+/// spend below. Charts stay aggregate-only this pass (see below).
 class _TodayCard extends StatelessWidget {
   final CHome cHome;
 
@@ -95,15 +106,18 @@ class _TodayCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Total Balance',
+              style: TextStyle(fontSize: 13, color: scheme.onPrimaryContainer)),
           Obx(() => Text(
-                AppFormat.currency(cHome.today),
+                AppFormat.currency(cHome.totalBalance),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: scheme.onPrimaryContainer,
                     fontSize: 30),
               )),
-          const SizedBox(height: 4),
-          Obx(() => Text(cHome.todayPercent,
+          const SizedBox(height: 8),
+          Obx(() => Text(
+              'Spent today: ${AppFormat.currency(cHome.today)} (${cHome.todayPercent})',
               style: TextStyle(
                   color: scheme.onPrimaryContainer.withValues(alpha: 0.85),
                   fontSize: 13))),
@@ -124,7 +138,252 @@ class _TodayCard extends StatelessWidget {
   }
 }
 
-/// Weekly bars inside a tonal card.
+/// Horizontally scrollable account cards + trailing "+ Add account".
+/// Tapping a card opens that account's own transaction list (HistoryBody
+/// pre-filtered — no new screen, no duplicated list logic).
+class _AccountRow extends StatelessWidget {
+  final CAccounts cAccounts;
+
+  const _AccountRow({required this.cAccounts});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Obx(() {
+      final accounts = cAccounts.accounts;
+      return SizedBox(
+        height: 132,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: accounts.length + 1,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (context, i) {
+            if (i == accounts.length) return const _AddAccountCard();
+            final a = accounts[i];
+            final balance = cAccounts.balanceOf(a.id);
+            final tint = CAccounts.parseColor(a.color);
+            return InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => Get.to(() => _AccountTransactionsPage(account: a)),
+              child: Container(
+                width: 168,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border(
+                    left: BorderSide(color: tint, width: 4),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Text(a.icon, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(a.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface)),
+                      ),
+                    ]),
+                    const Spacer(),
+                    Text(AppFormat.currency(balance),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: scheme.onSurface)),
+                    Text(a.kind,
+                        style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    });
+  }
+}
+
+/// Trailing card in the account row. Opens a minimal add-account sheet;
+/// creation goes through CAccounts so list + balances refresh together.
+class _AddAccountCard extends StatelessWidget {
+  const _AddAccountCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const _AddAccountSheet(),
+      ),
+      child: Container(
+        width: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_rounded, color: scheme.primary),
+            const SizedBox(height: 4),
+            Text('Add account',
+                style: TextStyle(fontSize: 12, color: scheme.primary)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+const _accountKinds = ['bank', 'e-wallet', 'cash', 'other'];
+const _accountIcons = ['🏦', '👛', '💵', '💰', '💳', '🐷'];
+const _accountColors = ['#7C5CFF', '#059669', '#DC2626', '#D97706', '#0284C7', '#DB2777'];
+
+class _AddAccountSheet extends StatefulWidget {
+  const _AddAccountSheet();
+
+  @override
+  State<_AddAccountSheet> createState() => _AddAccountSheetState();
+}
+
+class _AddAccountSheetState extends State<_AddAccountSheet> {
+  final _name = TextEditingController();
+  String _kind = 'bank';
+  String _icon = '🏦';
+  String _color = '#7C5CFF';
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    final created = await Get.find<CAccounts>().addAccount(
+      idUser: Get.find<CUser>().id,
+      name: name,
+      kind: _kind,
+      icon: _icon,
+      color: _color,
+    );
+    if (!mounted) return;
+    Navigator.pop(context, created != null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: 16 + MediaQuery.paddingOf(context).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('New account',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(
+                hintText: 'Name (e.g. BCA, GoPay, Cash)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _kind,
+              decoration: const InputDecoration(
+                  labelText: 'Type', border: OutlineInputBorder()),
+              items: _accountKinds
+                  .map((k) => DropdownMenuItem(value: k, child: Text(k)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _kind = v);
+              },
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: _accountIcons
+                  .map((e) => ChoiceChip(
+                        label: Text(e),
+                        selected: _icon == e,
+                        onSelected: (_) => setState(() => _icon = e),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _accountColors
+                  .map((hex) => ChoiceChip(
+                        label: Text('⬤',
+                            style: TextStyle(
+                                color: CAccounts.parseColor(hex))),
+                        selected: _color == hex,
+                        onSelected: (_) => setState(() => _color = hex),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Save account'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One account's transaction list: the shared HistoryBody with an account
+/// pre-filter, NOT a forked list screen.
+class _AccountTransactionsPage extends StatelessWidget {
+  final Account account;
+
+  const _AccountTransactionsPage({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(account.name)),
+      body: HistoryBody(accountId: account.id),
+    );
+  }
+}
+
+/// Weekly bars inside a tonal card. Aggregate-only this pass: per-account
+/// chart filtering would thread an accountId through c_home.analysis +
+/// SourceHistory.analysis for one dropdown — noted as follow-up, not built.
 class _WeeklyChart extends StatelessWidget {
   final CHome cHome;
 

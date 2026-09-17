@@ -439,7 +439,7 @@ class _AccountPickers extends StatelessWidget {
     return Obx(() {
       final list = accounts.accounts;
       if (list.isEmpty) {
-        return const Text('Add an account first (Home → + Add account)');
+        return const Text('Add an account first (Wallet → Add account)');
       }
       // Preserve the user's pick across rebuilds; only fill in blanks.
       // Writing an Rx inside Obx would re-trigger the build loop.

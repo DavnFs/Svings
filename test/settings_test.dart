@@ -72,12 +72,60 @@ void main() {
       ),
     );
 
-    // Tapping Transactions reports index 1 back to the shell, which drives
+    // Tapping Wallet reports index 1 back to the shell, which drives
     // the IndexedStack — the same index contract the MainTab enum pins.
+    await tester.tap(find.text('Wallet'));
+    await tester.pumpAndSettle();
+    expect(selected, MainTab.wallet);
+    expect(selected.index, 1);
+  });
+
+  testWidgets('highlight capsule follows all three tabs in order',
+      (tester) async {
+    var selected = MainTab.home;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            return Scaffold(
+              body: FloatingNavBar(
+                index: selected.index,
+                onChanged: (i) => setState(() => selected = MainTab.values[i]),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    // Bold (w700) label = selected tab — the same highlight signal the old
+    // 4-tab test used. Walk Home -> Wallet -> Transactions and assert the
+    // capsule follows each tap to the right index.
+    TextStyle labelStyle(String label) =>
+        tester.widget<Text>(find.text(label)).style!;
+
+    expect(selected, MainTab.home);
+    expect(labelStyle('Home').fontWeight, FontWeight.w700);
+
+    await tester.tap(find.text('Wallet'));
+    await tester.pumpAndSettle();
+    expect(selected, MainTab.wallet);
+    expect(selected.index, 1);
+    expect(labelStyle('Wallet').fontWeight, FontWeight.w700);
+    expect(labelStyle('Home').fontWeight, FontWeight.w500);
+
     await tester.tap(find.text('Transactions'));
     await tester.pumpAndSettle();
     expect(selected, MainTab.transactions);
-    expect(selected.index, 1);
+    expect(selected.index, 2);
+    expect(labelStyle('Transactions').fontWeight, FontWeight.w700);
+    expect(labelStyle('Wallet').fontWeight, FontWeight.w500);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(selected, MainTab.home);
+    expect(selected.index, 0);
+    expect(labelStyle('Home').fontWeight, FontWeight.w700);
   });
 
   test('destructive reset is double-gated', () {

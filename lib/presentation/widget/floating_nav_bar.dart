@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// The two tabs, in display order. Single source of truth: MainShell builds
+/// The three tabs, in display order. Single source of truth: MainShell builds
 /// its IndexedStack pages in [MainTab.values] order and passes the selected
 /// tab's index to the nav bar, so render order and highlight can never drift
 /// apart. (Income/Expense used to be tabs; they are now filters inside the
-/// Transactions screen — see HistoryBody.)
+/// Transactions screen — see HistoryBody. Wallet was split out of Home's
+/// account row so management lives in one place.)
 enum MainTab {
   home('Home', Icons.home_outlined, Icons.home, 'Home'),
+  wallet('Wallet', Icons.account_balance_wallet_outlined,
+      Icons.account_balance_wallet, 'Accounts'),
   transactions('Transactions', Icons.receipt_long_outlined, Icons.receipt_long,
       'Transaction history');
 
@@ -129,10 +132,10 @@ class _FloatingNavBarState extends State<FloatingNavBar> with SingleTickerProvid
                             widget.onChanged(i);
                           },
                           child: Padding(
-                            // No horizontal padding: the cell is already
-                            // narrow (~1/4 of the pill). Padding here stole
-                            // ~40dp per tab and clipped "History" on small
-                            // screens; the cell itself is the tap target.
+                            // No horizontal padding: cells are narrow (~1/3
+                            // of the pill). Padding here stole ~40dp per tab
+                            // and clipped labels on small screens; the cell
+                            // itself is the tap target.
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Column(mainAxisSize: MainAxisSize.min, children: [
                               Icon(

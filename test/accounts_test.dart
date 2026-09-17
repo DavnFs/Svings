@@ -10,7 +10,7 @@ import 'package:cause_money_record/presentation/widget/floating_nav_bar.dart';
 /// Accounts + transfer contracts:
 /// - transfers never count as income/expense on any of the four surfaces;
 /// - migration backfills account-less rows to the default account;
-/// - MainTab has exactly Home + Transactions (no dangling Income/Expense).
+/// - MainTab is exactly Home + Wallet + Transactions, in shell order.
 void main() {
   // Mirrors SourceHistory.analysis month loop: only income/expense accumulate.
   double monthIncome(List<History> rows) {
@@ -139,10 +139,10 @@ void main() {
   });
 
   group('MainTab reduction', () {
-    test('exactly Home + Transactions, in shell order', () {
+    test('exactly Home + Wallet + Transactions, in shell order', () {
       // test/settings_test.dart pins the tap->index contract; here pin the
       // enum shape so a re-added Income/Expense tab fails loudly.
-      expect(MainTabShape.labels, ['Home', 'Transactions']);
+      expect(MainTabShape.labels, ['Home', 'Wallet', 'Transactions']);
     });
 
     test('MainTab enum matches the pinned shape', () {
@@ -208,5 +208,5 @@ class _FakeStore extends SettingsStore {
 /// should not import for its animation controller). If MainTab gains a tab,
 /// update this list AND the shell IndexedStack together.
 class MainTabShape {
-  static const labels = ['Home', 'Transactions'];
+  static const labels = ['Home', 'Wallet', 'Transactions'];
 }

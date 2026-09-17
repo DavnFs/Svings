@@ -12,11 +12,15 @@ import 'package:cause_money_record/presentation/page/history/history_form_page.d
 import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
 import 'package:cause_money_record/presentation/page/settings_page.dart';
+import 'package:cause_money_record/presentation/page/wallet/wallet_body.dart';
 import 'package:cause_money_record/presentation/widget/floating_nav_bar.dart';
 
-/// Primary navigation shell: Home + Transactions in an IndexedStack under a
-/// floating MD3 nav pill, and a standard FAB for the primary "new entry"
-/// action.
+/// Primary navigation shell: Home + Wallet + Transactions in an IndexedStack
+/// under a floating MD3 nav pill, and a standard FAB for the primary
+/// "new entry" action.
+///
+/// The FAB is deliberately NOT contextual: it always means "add transaction"
+/// on every tab, so the action stays predictable wherever you are.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -52,6 +56,9 @@ class _MainShellState extends State<MainShell> {
 
   void _selectTab(int i) => setState(() => _tab = MainTab.values[i]);
 
+  /// Tab switch from content (Home's "See all" link into Wallet).
+  void goTo(MainTab tab) => setState(() => _tab = tab);
+
   Future<void> _newEntry() async {
     HapticFeedback.lightImpact();
     final result = await Get.to(() => const HistoryFormPage());
@@ -77,11 +84,14 @@ class _MainShellState extends State<MainShell> {
             color: Theme.of(context).colorScheme.primary,
             onRefresh: _refresh,
             // Plain setState tab switch — no Rx read here, so no Obx.
+            // Home's "See all" jumps here via callback, not via the shell
+            // type — keeps Home importable without a cycle.
             child: IndexedStack(
               index: _tab.index,
-              children: const [
-                _TabPage(child: HomeBody()),
-                _TabPage(child: HistoryBody()),
+              children: [
+                _TabPage(child: HomeBody(onSeeAll: () => goTo(MainTab.wallet))),
+                const _TabPage(child: WalletBody()),
+                const _TabPage(child: HistoryBody()),
               ],
             ),
           ),

@@ -77,4 +77,25 @@ class CAccounts extends GetxController {
     if (created != null) await getAccounts(idUser);
     return created;
   }
+
+  /// Renames / re-skins an account, then refreshes. Balances recompute from
+  /// the ledger (unchanged by an edit), so the caller just needs the list.
+  Future<Account?> updateAccount(
+    String idUser, {
+    required String id,
+    required String name,
+    String kind = 'other',
+    String icon = '💰',
+    String color = '#7C5CFF',
+  }) async {
+    final updated = await SourceAccount.update(
+      id: id,
+      name: name,
+      kind: kind,
+      icon: icon,
+      color: color,
+    );
+    if (updated != null) await getAccounts(idUser);
+    return updated;
+  }
 }

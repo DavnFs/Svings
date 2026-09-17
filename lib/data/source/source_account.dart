@@ -79,6 +79,33 @@ class SourceAccount {
     }
   }
 
+  /// Renames / re-skins an account. Balance untouched — it is derived from
+  /// the ledger, so editing metadata can never move money.
+  static Future<Account?> update({
+    required String id,
+    required String name,
+    String kind = 'other',
+    String icon = '💰',
+    String color = '#7C5CFF',
+  }) async {
+    try {
+      final resp = await _client
+          .from('accounts')
+          .update({
+            'name': name.trim(),
+            'kind': kind,
+            'icon': icon,
+            'color': color,
+          })
+          .eq('id', id)
+          .select()
+          .single();
+      return Account.fromSupabase(resp);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Derived balances: account id -> balance. Income adds, expense subtracts,
   /// transfer subtracts from source and adds to destination. Transfers never
   /// touch income/expense totals — that exclusion lives in the analysis

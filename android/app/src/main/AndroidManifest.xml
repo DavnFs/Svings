@@ -4,6 +4,10 @@
          for hot reload only, so a release build would have no network at all.
          This app is Supabase-only, so every data path needs it. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- local_auth biometric prompt. BIOMETRIC covers Android 10+; legacy
+         USE_BIOMETRIC/USE_FINGERPRINT are auto-merged by the plugin but the
+         explicit declaration documents the requirement. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
    <application
         android:label="svings"
         android:name="${applicationName}"

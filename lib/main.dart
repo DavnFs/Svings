@@ -16,6 +16,7 @@ import 'package:cause_money_record/presentation/controller/history/c_history_for
 import 'package:cause_money_record/presentation/controller/history/c_income_outcome.dart';
 import 'package:cause_money_record/presentation/page/auth/login_page.dart';
 import 'package:cause_money_record/presentation/page/main_shell.dart';
+import 'package:cause_money_record/presentation/widget/app_lock.dart';
 
 /// All controllers are created once at startup, so no screen can ever hit a
 /// "not found" from a `Get.find` before its `put` ran.
@@ -204,13 +205,15 @@ class _ThemedHostState extends State<_ThemedHost> {
       builder: (context, mode, _) => GetMaterialApp(
         debugShowCheckedModeBanner: false,
         // Wide screens: centered 600px column so the mobile UI never stretches.
+        // AppLock wraps INSIDE the constraint so the lock cover fills the app
+        // frame on every entry path — there is only one navigator below this.
         builder: (context, child) {
           AppColor.useScheme(Theme.of(context).colorScheme);
           final body = child ?? const SizedBox.shrink();
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 600),
-              child: body,
+              child: AppLock(child: body),
             ),
           );
         },

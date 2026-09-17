@@ -13,18 +13,17 @@ class SettingsStore {
   Future<void> deleteKey(String key) => _storage.delete(key: key);
 }
 
-/// Single settings state: the one source of truth for theme, glass toggle,
-/// and Gmail/LLM config. Screens read via `Get.find<CSettings>()` — never a
-/// duplicated local copy (same reasoning as the MainTab index fix).
+/// Single settings state: the one source of truth for theme and Gmail/LLM
+/// config. Screens read via `Get.find<CSettings>()` — never a duplicated
+/// local copy (same reasoning as the MainTab index fix).
 ///
 /// Split storage on purpose:
-/// - `SharedPreferences` (non-sensitive): theme, glass, decimals, LLM
+/// - `SharedPreferences` (non-sensitive): theme, decimals, LLM
 ///   provider/model, last-sync timestamp, 429 counter.
 /// - `FlutterSecureStorage` (credentials): Groq API key only. Never prefs,
 ///   never logs.
 class CSettings extends GetxController {
   static const _kTheme = 'settings.theme_mode'; // 'system' | 'light' | 'dark'
-  static const _kGlass = 'settings.reduce_glass';
   static const _kDecimals = 'settings.show_decimals';
   static const _kProvider = 'settings.llm_provider'; // 'groq'
   static const _kModel = 'settings.llm_model';
@@ -49,9 +48,6 @@ class CSettings extends GetxController {
 
   final _themeMode = ThemeMode.system.obs;
   ThemeMode get themeMode => _themeMode.value;
-
-  final _reduceGlass = false.obs;
-  bool get reduceGlass => _reduceGlass.value;
 
   final _showDecimals = true.obs;
   bool get showDecimals => _showDecimals.value;
@@ -88,7 +84,6 @@ class CSettings extends GetxController {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
-    _reduceGlass.value = prefs.getBool(_kGlass) ?? false;
     _showDecimals.value = prefs.getBool(_kDecimals) ?? true;
     _appLock.value = prefs.getBool(_kAppLock) ?? false;
     _lockOnResume.value = prefs.getBool(_kLockOnResume) ?? true;
@@ -104,11 +99,6 @@ class CSettings extends GetxController {
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode.value = mode;
     await _prefs.value?.setString(_kTheme, mode.name);
-  }
-
-  Future<void> setReduceGlass(bool v) async {
-    _reduceGlass.value = v;
-    await _prefs.value?.setBool(_kGlass, v);
   }
 
   Future<void> setShowDecimals(bool v) async {

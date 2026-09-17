@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_asset.dart';
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/page/auth/register_page.dart';
@@ -50,7 +49,9 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: scheme.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -67,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.w800,
-                          color: AppColor.textPrimary,
+                          color: scheme.onSurface,
                           fontSize: 26,
                         ),
                   ),
@@ -76,46 +77,50 @@ class _LoginPageState extends State<LoginPage> {
                     'Sign in to manage your income & expenses',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: AppColor.textSecondary,
+                      color: scheme.onSurfaceVariant,
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 36),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColor.card,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColor.border),
-                    ),
-                    child: Column(
-                      children: [
-                        _AuthField(
-                          controller: _emailController,
-                          label: 'Email',
-                          hint: 'name@example.com',
-                          icon: Icons.email_outlined,
-                          type: TextInputType.emailAddress,
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Email is required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _AuthField(
-                          controller: _passwordController,
-                          label: 'Password',
-                          hint: 'Enter your password',
-                          icon: Icons.lock_outline_rounded,
-                          obscure: _obscurePassword,
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                              color: AppColor.textSecondary,
-                              size: 20,
-                            ),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  Card.outlined(
+                    elevation: 0,
+                    margin: EdgeInsets.zero,
+                    color: scheme.surfaceContainerLow,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _AuthField(
+                            controller: _emailController,
+                            label: 'Email',
+                            hint: 'name@example.com',
+                            icon: Icons.email_outlined,
+                            type: TextInputType.emailAddress,
+                            validator: (v) =>
+                                (v == null || v.trim().isEmpty) ? 'Email is required' : null,
                           ),
-                          validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          _AuthField(
+                            controller: _passwordController,
+                            label: 'Password',
+                            hint: 'Enter your password',
+                            icon: Icons.lock_outline_rounded,
+                            obscure: _obscurePassword,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 20,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                            validator: (v) =>
+                                (v == null || v.isEmpty) ? 'Password is required' : null,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -124,28 +129,13 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     height: 52,
                     child: Obx(
-                      () => ElevatedButton(
+                      () => FilledButton(
                         onPressed: _loading.value ? null : _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColor.accent,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                         child: _loading.value
                             ? const SizedBox(
                                 width: 22,
                                 height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
+                                child: CircularProgressIndicator(strokeWidth: 2.5),
                               )
                             : const Text('Sign In'),
                       ),
@@ -157,14 +147,14 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Text(
                         "Don't have an account? ",
-                        style: TextStyle(color: AppColor.textSecondary, fontSize: 14),
+                        style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 14),
                       ),
                       GestureDetector(
                         onTap: () => Get.to(() => const RegisterPage()),
                         child: Text(
                           'Register',
                           style: TextStyle(
-                            color: AppColor.accent,
+                            color: scheme.primary,
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
                           ),
@@ -182,19 +172,19 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-/// Logo badge: solid matte tile, radius 20.
+/// Logo badge: tonal tile.
 class _LogoBadge extends StatelessWidget {
   const _LogoBadge();
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 76,
       height: 76,
       decoration: BoxDecoration(
-        color: AppColor.card,
+        color: scheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.border),
       ),
       child: Center(
         child: Image.asset(AppAsset.logo, width: 44, height: 44),
@@ -211,6 +201,7 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Obx(() {
       final err = error.value;
       if (err == null) return const SizedBox.shrink();
@@ -218,19 +209,18 @@ class _ErrorBanner extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColor.danger.withValues(alpha: 0.08),
+          color: scheme.errorContainer,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColor.danger.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            Icon(Icons.error_outline_rounded, color: AppColor.danger, size: 18),
+            Icon(Icons.error_outline_rounded, color: scheme.onErrorContainer, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 err,
                 style: TextStyle(
-                  color: AppColor.danger,
+                  color: scheme.onErrorContainer,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -243,7 +233,7 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-/// DESIGN.md auth input: radius 14, hairline border, accent focus ring.
+/// MD3 auth input: scheme outline, primary focus ring.
 class _AuthField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -267,6 +257,7 @@ class _AuthField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -275,7 +266,7 @@ class _AuthField extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColor.textPrimary,
+            color: scheme.onSurface,
           ),
         ),
         const SizedBox(height: 6),
@@ -284,35 +275,11 @@ class _AuthField extends StatelessWidget {
           obscureText: obscure,
           keyboardType: type,
           validator: validator,
-          style: TextStyle(color: AppColor.textPrimary, fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: AppColor.textSecondary.withValues(alpha: 0.7), fontSize: 14),
-            prefixIcon: Icon(icon, color: AppColor.textSecondary, size: 20),
+            prefixIcon: Icon(icon, size: 20),
             suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: AppColor.surface,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppColor.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppColor.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppColor.accent, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppColor.danger),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppColor.danger, width: 1.5),
-            ),
+            border: const OutlineInputBorder(),
           ),
         ),
       ],

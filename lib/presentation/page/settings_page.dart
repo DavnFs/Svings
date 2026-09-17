@@ -7,7 +7,6 @@ import 'package:local_auth/local_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/data/email/email_sync.dart';
 import 'package:cause_money_record/data/email/gmail_client.dart';
@@ -17,7 +16,6 @@ import 'package:cause_money_record/data/source/source_email.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_settings.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
-import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
 
 /// Settings, reached from the top-bar gear. Reads everything from the single
 /// [CSettings] — no local duplicates of theme/glass/LLM state.
@@ -32,7 +30,8 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const FrostedAppBar(title: 'Settings'),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: const [
@@ -51,21 +50,18 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Single matte group: 18dp radius, hairline border, 16dp padding.
+/// MD3 tonal group: surfaceContainerLow, no shadows.
 class _Group extends StatelessWidget {
   final Widget child;
   const _Group({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColor.border),
-      ),
-      child: child,
+    return Card.outlined(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 }
@@ -79,7 +75,10 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(text,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
+          style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface)),
     );
   }
 }
@@ -101,18 +100,19 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(children: [
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title,
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.textPrimary)),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: scheme.onSurface)),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
-            Text(subtitle!, style: TextStyle(fontSize: 12, color: AppColor.textSecondary)),
+            Text(subtitle!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
           ],
         ]),
       ),
-      Switch(key: toggleKey, value: value, activeThumbColor: AppColor.accent, onChanged: onChanged),
+      Switch(key: toggleKey, value: value, onChanged: onChanged),
     ]);
   }
 }
@@ -249,6 +249,7 @@ class _GmailSectionState extends State<_GmailSection> {
   @override
   Widget build(BuildContext context) {
     final s = Get.find<CSettings>();
+    final scheme = Theme.of(context).colorScheme;
     final connected = GmailClient.isConnected;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const _SectionTitle(text: 'Gmail & Automation'),
@@ -258,12 +259,12 @@ class _GmailSectionState extends State<_GmailSection> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(connected ? GmailClient.accountEmail ?? 'Connected' : 'Not connected',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600, color: scheme.onSurface)),
                 const SizedBox(height: 2),
                 Text(
                   connected ? 'Read-only Gmail access' : 'Connect to auto-import receipts',
-                  style: TextStyle(fontSize: 12, color: AppColor.textSecondary),
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
               ]),
             ),
@@ -271,7 +272,7 @@ class _GmailSectionState extends State<_GmailSection> {
               key: const Key('settings_gmail_connect'),
               onPressed: connected ? _disconnect : _connect,
               child: Text(connected ? 'Disconnect' : 'Connect',
-                  style: TextStyle(color: connected ? AppColor.danger : AppColor.accent)),
+                  style: TextStyle(color: connected ? scheme.error : scheme.primary)),
             ),
           ]),
           const Divider(height: 24),
@@ -283,7 +284,7 @@ class _GmailSectionState extends State<_GmailSection> {
                   last == null
                       ? 'Never synced'
                       : 'Last synced ${DateFormat('d MMM, HH:mm').format(last)}',
-                  style: TextStyle(fontSize: 13, color: AppColor.textSecondary),
+                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 );
               }),
             ),
@@ -299,25 +300,24 @@ class _GmailSectionState extends State<_GmailSection> {
           ]),
           if (_syncNote != null) ...[
             const SizedBox(height: 8),
-            Text(_syncNote!, style: TextStyle(fontSize: 12, color: AppColor.textSecondary)),
+            Text(_syncNote!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
           ],
           Obx(() => s.rateLimited
               ? Container(
                   margin: const EdgeInsets.only(top: 12),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColor.outcome.withValues(alpha: 0.08),
+                    color: scheme.errorContainer,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColor.outcome.withValues(alpha: 0.3)),
                   ),
                   child: Row(children: [
-                    Icon(Icons.warning_amber_rounded, color: AppColor.outcome, size: 18),
+                    Icon(Icons.warning_amber_rounded, color: scheme.onErrorContainer, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'LLM rate-limited (${s.rateHits}× 429). Sync stalled on the AI '
                         'fallback — regex results are unaffected. Try again later.',
-                        style: TextStyle(fontSize: 12, color: AppColor.outcome),
+                        style: TextStyle(fontSize: 12, color: scheme.onErrorContainer),
                       ),
                     ),
                   ]),
@@ -329,33 +329,27 @@ class _GmailSectionState extends State<_GmailSection> {
       _Group(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Parsing engine',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w600, color: scheme.onSurface)),
           const SizedBox(height: 4),
           Text('Regex runs first against known sender templates. The LLM is only '
               'called when regex finds no amount — enforced in code, not just described.',
-              style: TextStyle(fontSize: 12, color: AppColor.textSecondary, height: 1.4)),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, height: 1.4)),
           const SizedBox(height: 12),
           Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColor.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColor.border),
-              ),
-              child: Text('Groq', style: TextStyle(fontSize: 13, color: AppColor.textPrimary)),
-            ),
+            const Chip(label: Text('Groq')),
             const SizedBox(width: 8),
             Expanded(
               child: Obx(() => DropdownButtonFormField<String>(
                     key: const Key('settings_llm_model'),
                     initialValue: s.llmModel,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(),
                     ),
                     items: CSettings.groqModels
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13))))
+                        .map((m) =>
+                            DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13))))
                         .toList(),
                     onChanged: (m) {
                       if (m != null) s.setLlmModel(m);
@@ -388,30 +382,35 @@ class _GmailSectionState extends State<_GmailSection> {
               )),
           const SizedBox(height: 4),
           Text('Stored in the device keychain, never in app prefs or logs.',
-              style: TextStyle(fontSize: 11, color: AppColor.textSecondary)),
+              style: TextStyle(
+                  fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
       ),
       const SizedBox(height: 12),
       const _AutoImportsLog(),
       const SizedBox(height: 12),
-      Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColor.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColor.border),
-        ),
-        child: Row(children: [
-          Icon(Icons.verified_outlined, color: AppColor.income, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'No duplicates: every email is stored once by Gmail message ID — '
-              're-syncing the same inbox never creates a second transaction.',
-              style: TextStyle(fontSize: 12, color: AppColor.textSecondary, height: 1.4),
+      Card.outlined(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            Icon(Icons.verified_outlined,
+                color: Theme.of(context).colorScheme.tertiary, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No duplicates: every email is stored once by Gmail message ID — '
+                're-syncing the same inbox never creates a second transaction.',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4),
+              ),
             ),
-          ),
-        ]),
+          ]),
+        ),
       ),
     ]);
   }
@@ -463,82 +462,90 @@ class _AutoImportsLogState extends State<_AutoImportsLog> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColor.border),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-            child: Text('Recent auto-imports',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
-          ),
-          DropdownButton<String>(
-            value: _filter,
-            underline: const SizedBox.shrink(),
-            style: TextStyle(fontSize: 13, color: AppColor.textPrimary),
-            items: const [
-              DropdownMenuItem(value: 'All', child: Text('All')),
-              DropdownMenuItem(value: 'Pemasukan', child: Text('Income')),
-              DropdownMenuItem(value: 'Pengeluaran', child: Text('Expense')),
-            ],
-            onChanged: (v) {
-              if (v != null) setState(() => _filter = v);
-            },
-          ),
-        ]),
-        const SizedBox(height: 8),
-        FutureBuilder<List<History>>(
-          future: _future,
-          builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            var list = snap.data ?? const <History>[];
-            if (_filter != 'All') {
-              list = list.where((h) => h.type == _filter).toList();
-            }
-            if (list.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text('No auto-imported transactions yet.',
-                    style: TextStyle(fontSize: 13, color: AppColor.textSecondary)),
-              );
-            }
-            return Column(
-              children: list
-                  .map((h) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(children: [
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(AppFormat.currency(h.total),
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColor.textPrimary)),
-                              Text('${AppFormat.date(h.date)} · ${h.type}',
-                                  style: TextStyle(fontSize: 12, color: AppColor.textSecondary)),
+    final scheme = Theme.of(context).colorScheme;
+    return Card.outlined(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: scheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Expanded(
+                child: Text('Recent auto-imports',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: scheme.onSurface)),
+              ),
+              DropdownButton<String>(
+                value: _filter,
+                underline: const SizedBox.shrink(),
+                style: TextStyle(fontSize: 13, color: scheme.onSurface),
+                items: const [
+                  DropdownMenuItem(value: 'All', child: Text('All')),
+                  DropdownMenuItem(value: 'Pemasukan', child: Text('Income')),
+                  DropdownMenuItem(value: 'Pengeluaran', child: Text('Expense')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _filter = v);
+                },
+              ),
+            ]),
+            const SizedBox(height: 8),
+            FutureBuilder<List<History>>(
+              future: _future,
+              builder: (context, snap) {
+                final scheme = Theme.of(context).colorScheme;
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                var list = snap.data ?? const <History>[];
+                if (_filter != 'All') {
+                  list = list.where((h) => h.type == _filter).toList();
+                }
+                if (list.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text('No auto-imported transactions yet.',
+                        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                  );
+                }
+                return Column(
+                  children: list
+                      .map((h) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(children: [
+                              Expanded(
+                                child:
+                                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text(AppFormat.currency(h.total),
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: scheme.onSurface)),
+                                  Text('${AppFormat.date(h.date)} · ${h.type}',
+                                      style: TextStyle(
+                                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                                ]),
+                              ),
+                              TextButton(
+                                key: Key('settings_undo_${h.idHistory}'),
+                                onPressed: () => _undo(h),
+                                child: const Text('Undo'),
+                              ),
                             ]),
-                          ),
-                          TextButton(
-                            key: Key('settings_undo_${h.idHistory}'),
-                            onPressed: () => _undo(h),
-                            child: const Text('Undo'),
-                          ),
-                        ]),
-                      ))
-                  .toList(),
-            );
-          },
+                          ))
+                      .toList(),
+                );
+              },
+            ),
+          ],
         ),
-      ]),
+      ),
     );
   }
 }
@@ -553,6 +560,7 @@ class _AppearanceSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Get.find<CSettings>();
+    final scheme = Theme.of(context).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const _SectionTitle(text: 'Appearance'),
       _Group(
@@ -561,7 +569,7 @@ class _AppearanceSection extends StatelessWidget {
             Expanded(
               child: Text('Theme',
                   style:
-                      TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.textPrimary)),
+                      TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: scheme.onSurface)),
             ),
             DropdownButton<ThemeMode>(
               key: const Key('settings_theme_mode'),
@@ -577,14 +585,6 @@ class _AppearanceSection extends StatelessWidget {
               },
             ),
           ]),
-          const Divider(height: 24),
-          _ToggleRow(
-            title: 'Reduce glass effect',
-            subtitle: 'Solid surfaces instead of frosted blur',
-            value: s.reduceGlass,
-            toggleKey: const Key('settings_reduce_glass'),
-            onChanged: s.setReduceGlass,
-          ),
         ])),
       ),
     ]);
@@ -638,7 +638,7 @@ class _DataSection extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: Text('Continue', style: TextStyle(color: AppColor.danger)),
+            child: Text('Continue', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -658,7 +658,8 @@ class _DataSection extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(c, controller.text.trim() == 'DELETE'),
-            child: Text('Delete everything', style: TextStyle(color: AppColor.danger)),
+            child: Text('Delete everything',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -678,6 +679,7 @@ class _DataSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Get.find<CSettings>();
+    final scheme = Theme.of(context).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const _SectionTitle(text: 'Data'),
       _Group(
@@ -694,7 +696,7 @@ class _DataSection extends StatelessWidget {
             Expanded(
               child: Text('Export backup',
                   style:
-                      TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.textPrimary)),
+                      TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: scheme.onSurface)),
             ),
             TextButton(
               key: const Key('settings_export_csv'),
@@ -713,15 +715,15 @@ class _DataSection extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Reset all data',
                     style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.danger)),
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: scheme.error)),
                 Text('Deletes every transaction permanently',
-                    style: TextStyle(fontSize: 12, color: AppColor.textSecondary)),
+                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
               ]),
             ),
             TextButton(
               key: const Key('settings_reset_data'),
               onPressed: () => _reset(context),
-              child: Text('Reset…', style: TextStyle(color: AppColor.danger)),
+              child: Text('Reset…', style: TextStyle(color: scheme.error)),
             ),
           ]),
         ])),
@@ -739,6 +741,7 @@ class _AboutSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const _SectionTitle(text: 'About'),
       _Group(
@@ -751,17 +754,17 @@ class _AboutSection extends StatelessWidget {
                 Expanded(
                   child: Text('svings',
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600, color: AppColor.textPrimary)),
+                          fontSize: 15, fontWeight: FontWeight.w600, color: scheme.onSurface)),
                 ),
                 Text(v == null ? '…' : 'v${v.version} (${v.buildNumber})',
-                    style: TextStyle(fontSize: 13, color: AppColor.textSecondary)),
+                    style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
               ]),
               const Divider(height: 24),
               Row(children: [
                 Expanded(
                   child: Text('Found a bug?',
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w500, color: AppColor.textPrimary)),
+                          fontSize: 15, fontWeight: FontWeight.w500, color: scheme.onSurface)),
                 ),
                 TextButton(
                   onPressed: () => ScaffoldMessenger.of(context).showSnackBar(

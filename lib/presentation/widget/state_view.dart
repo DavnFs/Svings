@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cause_money_record/config/app_color.dart';
 
 /// Reusable state widget: handles loading, error, empty, and content
-/// in one place with BitChord-inspired clean aesthetics.
+/// in one place. Pure MD3 — scheme colors, tonal icon tiles, FilledButton.
 class StateView extends StatelessWidget {
   final bool loading;
   final String? error;
@@ -27,32 +26,30 @@ class StateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return _loadingView();
+    if (loading) return _loadingView(context);
     if (error != null) return _errorView(context);
     if (empty) return _emptyView(context);
     return child;
   }
 
-  Widget _loadingView() {
+  Widget _loadingView(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 32,
               height: 32,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: AppColor.accent,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             const SizedBox(height: 14),
             Text(
               'Loading...',
               style: TextStyle(
-                color: AppColor.textSecondary,
+                color: scheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -64,6 +61,7 @@ class StateView extends StatelessWidget {
   }
 
   Widget _errorView(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -74,13 +72,13 @@ class StateView extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColor.danger.withValues(alpha: 0.1),
+                color: scheme.errorContainer,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
                 Icons.cloud_off_outlined,
                 size: 30,
-                color: AppColor.danger,
+                color: scheme.onErrorContainer,
               ),
             ),
             const SizedBox(height: 16),
@@ -89,7 +87,7 @@ class StateView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppColor.textPrimary,
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),
@@ -98,24 +96,15 @@ class StateView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: AppColor.textSecondary,
+                color: scheme.onSurfaceVariant,
               ),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 18),
               SizedBox(
                 height: 40,
-                child: ElevatedButton.icon(
+                child: FilledButton.icon(
                   onPressed: onRetry,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColor.primary,
-                    foregroundColor: AppColor.onPrimary,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                   icon: const Icon(Icons.refresh_rounded, size: 16),
                   label: const Text('Try Again', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
@@ -128,6 +117,7 @@ class StateView extends StatelessWidget {
   }
 
   Widget _emptyView(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -138,13 +128,13 @@ class StateView extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColor.accent.withValues(alpha: 0.08),
+                color: scheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
                 emptyIcon,
                 size: 30,
-                color: AppColor.accent,
+                color: scheme.onSecondaryContainer,
               ),
             ),
             const SizedBox(height: 14),
@@ -153,7 +143,7 @@ class StateView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppColor.textPrimary,
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),
@@ -162,7 +152,7 @@ class StateView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: AppColor.textSecondary,
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ],

@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_dialog.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
-import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
-import 'package:cause_money_record/presentation/widget/pressable.dart';
 
 /// Create or edit a transaction. Pass [idHistory] to edit, omit it to create.
 class HistoryFormPage extends StatefulWidget {
@@ -64,11 +61,19 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     if (!mounted) return;
     if (success) {
       HapticFeedback.mediumImpact();
-      AppDialog.success(context, _isEditing ? 'Transaction updated successfully' : 'Transaction saved successfully');
+      AppDialog.success(
+          context,
+          _isEditing
+              ? 'Transaction updated successfully'
+              : 'Transaction saved successfully');
       await Future.delayed(const Duration(milliseconds: 700));
       Get.back(result: true);
     } else {
-      AppDialog.error(context, _isEditing ? 'Failed to update transaction' : 'Failed to save transaction');
+      AppDialog.error(
+          context,
+          _isEditing
+              ? 'Failed to update transaction'
+              : 'Failed to save transaction');
     }
   }
 
@@ -94,10 +99,12 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isIncome = c.type == 'Pemasukan';
 
     return Scaffold(
-      appBar: FrostedAppBar(title: _isEditing ? 'Edit Entry' : 'New Entry'),
+      backgroundColor: scheme.surface,
+      appBar: AppBar(title: Text(_isEditing ? 'Edit Entry' : 'New Entry')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
@@ -107,118 +114,63 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
             child: Column(
               children: [
                 Obx(() {
-                  final isCurrentlyIncome = c.type == 'Pemasukan';
-                  return Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColor.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Pressable(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              c.setType('Pemasukan');
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isCurrentlyIncome ? AppColor.income : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.arrow_downward_rounded,
-                                    size: 16,
-                                    color: isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Income',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isCurrentlyIncome ? FontWeight.w700 : FontWeight.w500,
-                                      color: isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Pressable(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              c.setType('Pengeluaran');
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: !isCurrentlyIncome ? AppColor.outcome : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.arrow_upward_rounded,
-                                    size: 16,
-                                    color: !isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Expense',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: !isCurrentlyIncome ? FontWeight.w700 : FontWeight.w500,
-                                      color: !isCurrentlyIncome ? Colors.white : AppColor.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                  return SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'Pemasukan',
+                        label: Text('Income'),
+                        icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: 'Pengeluaran',
+                        label: Text('Expense'),
+                        icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                      ),
+                    ],
+                    selected: {c.type},
+                    onSelectionChanged: (s) {
+                      HapticFeedback.selectionClick();
+                      c.setType(s.first);
+                    },
+                    showSelectedIcon: false,
+                    style: SegmentedButton.styleFrom(
+                      selectedForegroundColor: scheme.onSecondaryContainer,
+                      selectedBackgroundColor: scheme.secondaryContainer,
                     ),
                   );
                 }),
                 const SizedBox(height: 14),
-                Divider(height: 1, color: AppColor.border),
+                Divider(height: 1, color: scheme.outlineVariant),
                 const SizedBox(height: 14),
-                Pressable(
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
                   onTap: _pickDate,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today_rounded, size: 20, color: AppColor.accent),
+                        Icon(Icons.calendar_today_rounded,
+                            size: 20, color: scheme.primary),
                         const SizedBox(width: 12),
                         Text(
                           'Date',
-                          style: TextStyle(color: AppColor.textSecondary, fontSize: 14),
+                          style: TextStyle(
+                              color: scheme.onSurfaceVariant, fontSize: 14),
                         ),
                         const Spacer(),
                         Obx(
                           () => Text(
                             AppFormat.date(c.date),
                             style: TextStyle(
-                              color: AppColor.textPrimary,
+                              color: scheme.onSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(Icons.chevron_right_rounded, size: 18, color: AppColor.textSecondary),
+                        Icon(Icons.chevron_right_rounded,
+                            size: 18, color: scheme.onSurfaceVariant),
                       ],
                     ),
                   ),
@@ -252,12 +204,6 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                     onPressed: _addItem,
                     icon: const Icon(Icons.add_rounded, size: 18),
                     label: const Text('Add to List'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColor.accent,
-                      side: BorderSide(color: AppColor.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
                   ),
                 ),
               ],
@@ -274,7 +220,9 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text(
                       'No items added yet. Add an item above to continue.',
-                      style: TextStyle(color: AppColor.textSecondary, fontSize: 13),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 13),
                     ),
                   ),
                 );
@@ -286,42 +234,49 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: c.items.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: AppColor.border),
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 1, color: scheme.outlineVariant),
                     itemBuilder: (context, index) {
                       final item = c.items[index];
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Row(
                           children: [
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: AppColor.surface,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${index + 1}',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColor.textSecondary),
-                                ),
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: scheme.surfaceContainerHighest,
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.onSurfaceVariant),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 item.name,
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColor.textPrimary),
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: scheme.onSurface),
                               ),
                             ),
                             Text(
                               AppFormat.currency(num.tryParse(item.price) ?? 0),
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.onSurface),
                             ),
                             const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () => c.deleteItem(index),
-                              child: Icon(Icons.close_rounded, size: 18, color: AppColor.textSecondary),
+                            IconButton(
+                              tooltip: 'Remove item',
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(Icons.close_rounded,
+                                  size: 18, color: scheme.onSurfaceVariant),
+                              onPressed: () => c.deleteItem(index),
                             ),
                           ],
                         ),
@@ -329,22 +284,28 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
                     },
                   ),
                   const SizedBox(height: 14),
-                  Divider(height: 1, color: AppColor.border),
+                  Divider(height: 1, color: scheme.outlineVariant),
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Total Amount',
-                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColor.textPrimary, fontSize: 15),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                            fontSize: 15),
                       ),
                       Text(
                         AppFormat.currency(c.total),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: isIncome ? AppColor.income : AppColor.accent,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color:
+                                  isIncome ? scheme.tertiary : scheme.primary,
+                            ),
                       ),
                     ],
                   ),
@@ -357,17 +318,8 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
             width: double.infinity,
             height: 52,
             child: Obx(
-              () => ElevatedButton(
+              () => FilledButton(
                 onPressed: c.items.isNotEmpty ? _submit : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.accent,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColor.border,
-                  disabledForegroundColor: AppColor.textSecondary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
                 child: Text(_isEditing ? 'Save Changes' : 'Save Transaction'),
               ),
             ),
@@ -378,7 +330,7 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
   }
 }
 
-/// Single-surface form group: solid matte, radius 18, 16dp padding.
+/// MD3 tonal form group: surfaceContainerLow, no shadows.
 class _FormGroup extends StatelessWidget {
   final Widget child;
 
@@ -386,19 +338,16 @@ class _FormGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColor.border),
-      ),
-      child: child,
+    return Card.outlined(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 }
 
-/// DESIGN.md input: radius 14, hairline border, accent focus ring.
+/// MD3 outlined input: scheme outline, primary focus ring.
 class _ItemField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
@@ -417,23 +366,16 @@ class _ItemField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: TextStyle(color: AppColor.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: AppColor.textSecondary.withValues(alpha: 0.7), fontSize: 14),
-        prefixIcon: Icon(icon, size: 18, color: AppColor.textSecondary),
-        filled: true,
-        fillColor: AppColor.surface,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColor.accent)),
+        prefixIcon: Icon(icon, size: 18),
+        border: const OutlineInputBorder(),
       ),
     );
   }
 }
 
-/// DESIGN.md section label: 13sp w700 secondary.
+/// MD3 label: 13sp w700 on-surface-variant.
 class _SectionLabel extends StatelessWidget {
   final String text;
 
@@ -446,7 +388,7 @@ class _SectionLabel extends StatelessWidget {
       style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
-        color: AppColor.textSecondary,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 0.5,
       ),
     );

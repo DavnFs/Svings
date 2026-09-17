@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_asset.dart';
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
@@ -13,12 +12,10 @@ import 'package:cause_money_record/presentation/page/history/history_page.dart';
 import 'package:cause_money_record/presentation/page/history/income_outcome_page.dart';
 import 'package:cause_money_record/presentation/page/home/home_body.dart';
 import 'package:cause_money_record/presentation/page/settings_page.dart';
-import 'package:cause_money_record/presentation/widget/floating_tab_bar.dart'
-    show FloatingTabBar, MainTab;
-import 'package:cause_money_record/presentation/widget/frosted_bar.dart';
+import 'package:cause_money_record/presentation/widget/floating_nav_bar.dart';
 
-/// Primary navigation shell: a floating BitChord-style glass pill on the
-/// bottom edge, four tabs in an IndexedStack, and a standard FAB for the
+/// Primary navigation shell: a Google Photos-style floating MD3 nav pill on
+/// the bottom edge, four tabs in an IndexedStack, and a standard FAB for the
 /// primary "new entry" action.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -64,7 +61,6 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColor.surface,
       // extendBody lets the list scroll UNDER the floating pill; the bottom
       // padding on the lists keeps the last row clear of it.
       extendBody: true,
@@ -72,7 +68,7 @@ class _MainShellState extends State<MainShell> {
         bottom: false,
         child: Stack(children: [
           RefreshIndicator(
-            color: AppColor.accent,
+            color: Theme.of(context).colorScheme.primary,
             onRefresh: _refresh,
             // Plain setState tab switch — no Rx read here, so no Obx.
             child: IndexedStack(
@@ -86,23 +82,20 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
           Positioned(
-            left: 16,
-            right: 16,
+            left: 0,
+            right: 0,
             bottom: 0,
-            child: FloatingTabBar(index: _tab.index, onChanged: _selectTab),
+            child: FloatingNavBar(index: _tab.index, onChanged: _selectTab),
           ),
         ]),
       ),
       floatingActionButton: Padding(
-        // DESIGN.md is silent on FAB placement; (a) is the smaller change:
-        // float above the pill — pill (~66dp) + 16dp margin + safe area.
+        // Float above the pill — pill height + 16dp margin + safe area.
         padding: EdgeInsets.only(bottom: 82 + MediaQuery.paddingOf(context).bottom),
         child: FloatingActionButton(
           key: const Key('main_new_entry_fab'),
           onPressed: _newEntry,
           tooltip: 'Record new entry',
-          backgroundColor: AppColor.accent,
-          foregroundColor: Colors.white,
           child: const Icon(Icons.add),
         ),
       ),
@@ -110,8 +103,7 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// One tab page: frosted top bar + header + content. The bar is the dose-cap's
-/// first frosted element; everything below it is matte.
+/// One tab page: MD3 top bar + content.
 class _TabPage extends StatelessWidget {
   final Widget child;
 
@@ -126,14 +118,17 @@ class _TabPage extends StatelessWidget {
   }
 }
 
-/// Frosted top bar: avatar + greeting + sign out over the shared material.
+/// MD3 center-aligned top bar: avatar + greeting + settings + sign out on the
+/// scheme surface. No blur — tonal surface only.
 class _TopBar extends StatelessWidget {
   const _TopBar();
 
   @override
   Widget build(BuildContext context) {
     final shell = context.findAncestorStateOfType<_MainShellState>()!;
-    return FrostedBar(
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
       child: SafeArea(
         bottom: false,
         child: Padding(
@@ -149,7 +144,7 @@ class _TopBar extends StatelessWidget {
                 c.name.isEmpty ? 'Hi,' : 'Hi, ${c.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             )),
             Semantics(
@@ -167,7 +162,7 @@ class _TopBar extends StatelessWidget {
               button: true,
               child: IconButton(
                 tooltip: 'Sign out',
-                icon: Icon(Icons.logout, color: AppColor.danger, size: 20),
+                icon: Icon(Icons.logout, color: scheme.error, size: 20),
                 onPressed: shell._signOut,
               ),
             ),

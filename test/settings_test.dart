@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cause_money_record/presentation/controller/c_settings.dart';
-import 'package:cause_money_record/presentation/widget/glass_lite.dart';
+import 'package:cause_money_record/presentation/widget/floating_nav_bar.dart';
 
 /// In-memory seams: no platform channels, so these tests cannot hang on
 /// missing plugins. Mirrors the EmailSync injectable-store pattern.
@@ -30,7 +30,7 @@ class _FakeStore extends SettingsStore {
 
 /// Settings contract, per the brief:
 /// - theme toggle propagates app-wide (single source of truth);
-/// - glass toggle removes BackdropFilter from the tree;
+/// - nav bar switches the IndexedStack/MainTab index;
 /// - reset requires confirmation (double gate, covered by dialog presence).
 void main() {
   setUp(() => Get.testMode = true);
@@ -59,25 +59,30 @@ void main() {
     expect(observed, ThemeMode.light);
   });
 
-  testWidgets('glass toggle removes BackdropFilter from the tree', (tester) async {
-    final s = CSettings(store: _FakeStore());
-    Get.put<CSettings>(s);
-    await s.load();
-
+  testWidgets('bottom nav bar switches the shell tab index', (tester) async {
+    MainTab selected = MainTab.home;
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: GlassLite(child: Text('bar')))),
+      MaterialApp(
+        home: Scaffold(
+          body: FloatingNavBar(
+            index: selected.index,
+            onChanged: (i) => selected = MainTab.values[i],
+          ),
+        ),
+      ),
     );
-    expect(find.byType(BackdropFilter), findsOneWidget);
 
-    await s.setReduceGlass(true);
-    await tester.pump();
-    expect(find.byType(BackdropFilter), findsNothing);
-    // Same tile, solid — radius preserved.
-    expect(find.byType(GlassLite), findsOneWidget);
+    // Tapping Expense reports index 2 back to the shell, which drives the
+    // IndexedStack — the same index contract the MainTab enum pins.
+    await tester.tap(find.text('Expense'));
+    await tester.pumpAndSettle();
+    expect(selected, MainTab.expense);
+    expect(selected.index, 2);
 
-    await s.setReduceGlass(false);
-    await tester.pump();
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    expect(selected, MainTab.history);
+    expect(selected.index, 3);
   });
 
   test('destructive reset is double-gated', () {

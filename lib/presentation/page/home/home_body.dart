@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
@@ -23,7 +22,11 @@ class HomeBody extends StatelessWidget {
       if (cHome.loading && cHome.today == 0) {
         return ListView(children: const [
           SizedBox(height: 80),
-          StateView(loading: true, error: null, empty: false, child: SizedBox.shrink()),
+          StateView(
+              loading: true,
+              error: null,
+              empty: false,
+              child: SizedBox.shrink()),
         ]);
       }
       if (cHome.error != null) {
@@ -66,15 +69,17 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Text(
       title,
-      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary),
+      style: TextStyle(
+          fontSize: 18, fontWeight: FontWeight.w700, color: scheme.onSurface),
     );
   }
 }
 
-/// Hero summary card: solid accent fill, radius 18, white figures. The one
-/// decorative surface on screen — everything around it stays matte.
+/// Hero summary card: primary-container tonal fill, on-primary-container
+/// figures. No shadows — depth comes from tone.
 class _TodayCard extends StatelessWidget {
   final CHome cHome;
 
@@ -82,45 +87,44 @@ class _TodayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColor.accent,
-        borderRadius: BorderRadius.circular(18),
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Obx(() => Text(
+                AppFormat.currency(cHome.today),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onPrimaryContainer,
+                    fontSize: 30),
+              )),
+          const SizedBox(height: 4),
+          Obx(() => Text(cHome.todayPercent,
+              style: TextStyle(
+                  color: scheme.onPrimaryContainer.withValues(alpha: 0.85),
+                  fontSize: 13))),
+          const SizedBox(height: 16),
+          Obx(() {
+            final todayId = cHome.todayId;
+            if (todayId == null) return const SizedBox.shrink();
+            return FilledButton.tonalIcon(
+              onPressed: () =>
+                  Get.to(() => DetailHistoryPage(idHistory: todayId)),
+              icon: const Icon(Icons.arrow_forward, size: 16),
+              label: const Text('View Details'),
+            );
+          }),
+        ]),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Obx(() => Text(
-              AppFormat.currency(cHome.today),
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 30),
-            )),
-        const SizedBox(height: 4),
-        Obx(() => Text(cHome.todayPercent,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13))),
-        const SizedBox(height: 16),
-        Obx(() {
-          final todayId = cHome.todayId;
-          if (todayId == null) return const SizedBox.shrink();
-          return OutlinedButton.icon(
-            onPressed: () => Get.to(() => DetailHistoryPage(idHistory: todayId)),
-            icon: const Icon(Icons.arrow_forward, size: 16),
-            label: const Text('View Details'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          );
-        }),
-      ]),
     );
   }
 }
 
-/// Weekly bars inside a grouped card.
+/// Weekly bars inside a tonal card.
 class _WeeklyChart extends StatelessWidget {
   final CHome cHome;
 
@@ -144,69 +148,82 @@ class _WeeklyChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GroupCard(
-      child: Obx(() {
-        final data = cHome.week;
-        final labels = cHome.weekText();
-        final maxVal = data.reduce(max).clamp(1.0, double.infinity);
-        final hasData = data.any((v) => v > 0);
-        if (!hasData) {
-          return const SizedBox(
+    final scheme = Theme.of(context).colorScheme;
+    return Card.outlined(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: scheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Obx(() {
+          final data = cHome.week;
+          final labels = cHome.weekText();
+          final maxVal = data.reduce(max).clamp(1.0, double.infinity);
+          final hasData = data.any((v) => v > 0);
+          if (!hasData) {
+            return const SizedBox(
+              height: 160,
+              child: StateView(
+                loading: false,
+                error: null,
+                empty: true,
+                emptyTitle: 'Belum ada data minggu ini',
+                emptyMessage:
+                    'Catat transaksi pertama Anda untuk melihat grafik',
+                emptyIcon: Icons.bar_chart_outlined,
+                child: SizedBox.shrink(),
+              ),
+            );
+          }
+          return SizedBox(
             height: 160,
-            child: StateView(
-              loading: false,
-              error: null,
-              empty: true,
-              emptyTitle: 'Belum ada data minggu ini',
-              emptyMessage: 'Catat transaksi pertama Anda untuk melihat grafik',
-              emptyIcon: Icons.bar_chart_outlined,
-              child: SizedBox.shrink(),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(7, (i) {
+                final ratio = data[i] / maxVal;
+                return Expanded(
+                  // Tight cells: 7 columns share the card width, so each keeps
+                  // only 2dp gutters — 4dp each side clipped the last bar.
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (data[i] > 0)
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _compactValue(data[i]),
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 9, color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Container(
+                          height: (ratio * 120).clamp(4.0, 120),
+                          decoration: BoxDecoration(
+                              color: scheme.primary,
+                              borderRadius: BorderRadius.circular(4)),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(labels[i],
+                            style: TextStyle(
+                                fontSize: 10, color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                );
+              }),
             ),
           );
-        }
-        return SizedBox(
-          height: 160,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(7, (i) {
-              final ratio = data[i] / maxVal;
-              return Expanded(
-                // Tight cells: 7 columns share the card width, so each keeps
-                // only 2dp gutters — 4dp each side clipped the last bar.
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (data[i] > 0)
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            _compactValue(data[i]),
-                            maxLines: 1,
-                            style: TextStyle(fontSize: 9, color: AppColor.textSecondary),
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      Container(
-                        height: (ratio * 120).clamp(4.0, 120),
-                        decoration: BoxDecoration(color: AppColor.accent, borderRadius: BorderRadius.circular(4)),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(labels[i], style: TextStyle(fontSize: 10, color: AppColor.textSecondary)),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        );
-      }),
+        }),
+      ),
     );
   }
 }
 
-/// Monthly donut + ledger inside a grouped card.
+/// Monthly donut + ledger inside a tonal card.
 class _MonthlySection extends StatelessWidget {
   final CHome cHome;
 
@@ -214,69 +231,92 @@ class _MonthlySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GroupCard(
-      child: Obx(() {
-        if (cHome.monthIncome == 0 && cHome.monthOutcome == 0) {
-          return const SizedBox(
-            height: 200,
-            child: StateView(
-              loading: false,
-              error: null,
-              empty: true,
-              emptyTitle: 'Belum ada transaksi bulan ini',
-              emptyMessage: 'Tambah Pemasukan atau Pengeluaran untuk mulai melacak',
-              emptyIcon: Icons.pie_chart_outline,
-              child: SizedBox.shrink(),
-            ),
-          );
-        }
-        return Column(children: [
-          Row(children: [
-            SizedBox(
-              width: 140,
-              height: 140,
-              child: Stack(children: [
-                CustomPaint(
-                  size: const Size(140, 140),
-                  painter: _DonutPainter(
-                    income: cHome.monthIncome,
-                    outcome: cHome.monthOutcome,
-                    incomeColor: AppColor.income,
-                    outcomeColor: AppColor.outcome,
+    final scheme = Theme.of(context).colorScheme;
+    return Card.outlined(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: scheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Obx(() {
+          if (cHome.monthIncome == 0 && cHome.monthOutcome == 0) {
+            return const SizedBox(
+              height: 200,
+              child: StateView(
+                loading: false,
+                error: null,
+                empty: true,
+                emptyTitle: 'Belum ada transaksi bulan ini',
+                emptyMessage:
+                    'Tambah Pemasukan atau Pengeluaran untuk mulai melacak',
+                emptyIcon: Icons.pie_chart_outline,
+                child: SizedBox.shrink(),
+              ),
+            );
+          }
+          return Column(children: [
+            Row(children: [
+              SizedBox(
+                width: 140,
+                height: 140,
+                child: Stack(children: [
+                  CustomPaint(
+                    size: const Size(140, 140),
+                    painter: _DonutPainter(
+                      income: cHome.monthIncome,
+                      outcome: cHome.monthOutcome,
+                      incomeColor: scheme.tertiary,
+                      outcomeColor: scheme.error,
+                      emptyColor: scheme.outlineVariant,
+                    ),
                   ),
-                ),
-                Center(
-                  child: Text('${cHome.percentIncome}%',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColor.textPrimary)),
-                ),
+                  Center(
+                    child: Text('${cHome.percentIncome}%',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface)),
+                  ),
+                ]),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    _LegendItem(color: scheme.tertiary, label: 'Income'),
+                    const SizedBox(height: 8),
+                    _LegendItem(color: scheme.error, label: 'Expense'),
+                    const SizedBox(height: 16),
+                    Text(cHome.monthPercent,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                            height: 1.4)),
+                  ])),
+            ]),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                Text('Difference',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant, fontSize: 13)),
+                const Spacer(),
+                Text(AppFormat.currency(cHome.differentMonth),
+                    style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700)),
               ]),
             ),
-            const SizedBox(width: 24),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _LegendItem(color: AppColor.income, label: 'Income'),
-              const SizedBox(height: 8),
-              _LegendItem(color: AppColor.outcome, label: 'Expense'),
-              const SizedBox(height: 16),
-              Text(cHome.monthPercent, style: TextStyle(fontSize: 12, color: AppColor.textSecondary, height: 1.4)),
-            ])),
-          ]),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-            decoration: BoxDecoration(
-              color: AppColor.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColor.border),
-            ),
-            child: Row(children: [
-              Text('Difference', style: TextStyle(color: AppColor.textSecondary, fontSize: 13)),
-              const Spacer(),
-              Text(AppFormat.currency(cHome.differentMonth),
-                  style: TextStyle(color: AppColor.accent, fontSize: 14, fontWeight: FontWeight.w700)),
-            ]),
-          ),
-        ]);
-      }),
+          ]);
+        }),
+      ),
     );
   }
 }
@@ -290,32 +330,17 @@ class _LegendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(children: [
-      Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+      Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(3))),
       const SizedBox(width: 8),
-      Text(label, style: TextStyle(fontSize: 13, color: AppColor.textSecondary)),
+      Text(label,
+          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
     ]);
-  }
-}
-
-/// DESIGN.md inset grouped surface: single solid matte card, radius 18,
-/// 16dp inner padding, hairline outline. No nested cards, no glass.
-class _GroupCard extends StatelessWidget {
-  final Widget child;
-
-  const _GroupCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColor.border),
-      ),
-      child: child,
-    );
   }
 }
 
@@ -324,8 +349,14 @@ class _DonutPainter extends CustomPainter {
   final double outcome;
   final Color incomeColor;
   final Color outcomeColor;
+  final Color emptyColor;
 
-  _DonutPainter({required this.income, required this.outcome, required this.incomeColor, required this.outcomeColor});
+  _DonutPainter(
+      {required this.income,
+      required this.outcome,
+      required this.incomeColor,
+      required this.outcomeColor,
+      required this.emptyColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -339,14 +370,15 @@ class _DonutPainter extends CustomPainter {
 
     final total = income + outcome;
     if (total == 0) {
-      paint.color = AppColor.border;
+      paint.color = emptyColor;
       canvas.drawCircle(center, radius - strokeWidth / 2, paint);
       return;
     }
 
     final incomeAngle = (income / total) * 2 * pi;
     final outcomeAngle = (outcome / total) * 2 * pi;
-    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final rect =
+        Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
 
     paint.color = incomeColor;
     canvas.drawArc(rect, -pi / 2, incomeAngle, false, paint);
@@ -355,5 +387,10 @@ class _DonutPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
+      oldDelegate.income != income ||
+      oldDelegate.outcome != outcome ||
+      oldDelegate.incomeColor != incomeColor ||
+      oldDelegate.outcomeColor != outcomeColor ||
+      oldDelegate.emptyColor != emptyColor;
 }

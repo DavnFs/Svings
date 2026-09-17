@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_dialog.dart';
 import 'package:cause_money_record/config/app_format.dart';
 import 'package:cause_money_record/data/model/history.dart';
@@ -9,8 +8,6 @@ import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_income_outcome.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
 import 'package:cause_money_record/presentation/page/history/history_form_page.dart';
-import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
-import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 /// Money entries of one type — 'Pemasukan' or 'Pengeluaran'.
@@ -31,7 +28,8 @@ class _IncomeOutcomePageState extends State<IncomeOutcomePage> {
   Widget build(BuildContext context) {
     final isIncome = widget.type == 'Pemasukan';
     return Scaffold(
-      appBar: FrostedAppBar(title: isIncome ? 'Income Records' : 'Expense Records'),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(title: Text(isIncome ? 'Income Records' : 'Expense Records')),
       body: IncomeOutcomeBody(type: widget.type),
     );
   }
@@ -76,13 +74,12 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isIncome = widget.type == 'Pemasukan';
-    return Obx(() {
-      return _list(context, isIncome);
-    });
+    return Obx(() => _list(scheme, isIncome));
   }
 
-  Widget _list(BuildContext context, bool isIncome) {
+  Widget _list(ColorScheme scheme, bool isIncome) {
         if (cInOut.loading) {
           return const StateView(
             loading: true,
@@ -102,7 +99,7 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
         }
         if (cInOut.list.isEmpty) {
           return RefreshIndicator(
-            color: AppColor.accent,
+            color: scheme.primary,
             onRefresh: () async => _refresh(),
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -123,17 +120,15 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
         }
 
         return RefreshIndicator(
-          color: AppColor.accent,
+          color: scheme.primary,
           onRefresh: () async => _refresh(),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColor.card,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColor.border),
-                ),
+              Card.outlined(
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                color: scheme.surfaceContainerLow,
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -141,69 +136,18 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
                   itemCount: cInOut.list.length,
                   separatorBuilder: (_, __) => Divider(
                     height: 1,
-                    color: AppColor.border,
+                    color: scheme.outlineVariant,
                     indent: 64,
                     endIndent: 16,
                   ),
                   itemBuilder: (context, index) {
                     final h = cInOut.list[index];
-                    return Pressable(
+                    return _EntryRow(
+                      scheme: scheme,
+                      isIncome: isIncome,
+                      history: h,
                       onTap: () => Get.to(() => DetailHistoryPage(idHistory: h.idHistory!)),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: isIncome
-                                    ? AppColor.income.withValues(alpha: 0.12)
-                                    : AppColor.outcome.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
-                                isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                color: isIncome ? AppColor.income : AppColor.outcome,
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                AppFormat.date(h.date),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColor.textPrimary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              AppFormat.currency(h.total),
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: isIncome ? AppColor.income : AppColor.textPrimary,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Semantics(
-                              label: 'More actions for entry on ${AppFormat.date(h.date)}',
-                              button: true,
-                              child: PopupMenuButton<String>(
-                                tooltip: 'More actions',
-                                icon: Icon(Icons.more_vert_rounded, color: AppColor.textSecondary, size: 20),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'update', child: Text('Edit')),
-                                  PopupMenuItem(value: 'delete', child: Text('Delete')),
-                                ],
-                                onSelected: (v) => _handleMenu(v, h),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      onMenu: (v) => _handleMenu(v, h),
                     );
                   },
                 ),
@@ -211,5 +155,83 @@ class _IncomeOutcomeBodyState extends State<IncomeOutcomeBody> {
             ],
           ),
         );
+  }
+}
+
+/// One income/expense row: status icon, date, amount, overflow menu.
+class _EntryRow extends StatelessWidget {
+  final ColorScheme scheme;
+  final bool isIncome;
+  final History history;
+  final VoidCallback onTap;
+  final ValueChanged<String> onMenu;
+
+  const _EntryRow({
+    required this.scheme,
+    required this.isIncome,
+    required this.history,
+    required this.onTap,
+    required this.onMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final status = isIncome ? scheme.tertiary : scheme.error;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: status.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                color: status,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                AppFormat.date(history.date),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            Text(
+              AppFormat.currency(history.total),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isIncome ? status : scheme.onSurface,
+                fontSize: 14,
+              ),
+            ),
+            Semantics(
+              label: 'More actions for entry on ${AppFormat.date(history.date)}',
+              button: true,
+              child: PopupMenuButton<String>(
+                tooltip: 'More actions',
+                icon: Icon(Icons.more_vert_rounded, color: scheme.onSurfaceVariant, size: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'update', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+                onSelected: onMenu,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

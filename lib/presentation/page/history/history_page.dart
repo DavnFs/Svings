@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_dialog.dart';
@@ -9,8 +8,6 @@ import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
-import 'package:cause_money_record/presentation/widget/frosted_app_bar.dart';
-import 'package:cause_money_record/presentation/widget/pressable.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -23,9 +20,10 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: FrostedAppBar(title: 'Transaction History'),
-      body: HistoryBody(),
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(title: const Text('Transaction History')),
+      body: const HistoryBody(),
     );
   }
 }
@@ -73,6 +71,7 @@ class _HistoryBodyState extends State<HistoryBody> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         Padding(
@@ -106,7 +105,7 @@ class _HistoryBodyState extends State<HistoryBody> {
 
               if (filtered.isEmpty) {
                 return RefreshIndicator(
-                  color: AppColor.accent,
+                  color: scheme.primary,
                   onRefresh: () async => _refresh(),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -129,7 +128,7 @@ class _HistoryBodyState extends State<HistoryBody> {
               }
 
               return RefreshIndicator(
-                color: AppColor.accent,
+                color: scheme.primary,
                 onRefresh: () async => _refresh(),
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
@@ -140,6 +139,7 @@ class _HistoryBodyState extends State<HistoryBody> {
                         final h = filtered[index];
                         final isIncome = h.type == 'Pemasukan';
                         return _TransactionRow(
+                          scheme: scheme,
                           date: AppFormat.date(h.date),
                           isIncome: isIncome,
                           amount: '${isIncome ? '+' : '-'}${AppFormat.currency(h.total)}',
@@ -168,50 +168,26 @@ class _FilterSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColor.border),
-      ),
-      child: Row(
-        children: ['All', 'Income', 'Expense'].map((f) {
-          final isSelected = value == f;
-          return Expanded(
-            child: Pressable(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onChanged(f);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColor.accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Text(
-                    f,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected ? Colors.white : AppColor.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+    final scheme = Theme.of(context).colorScheme;
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(value: 'All', label: Text('All')),
+        ButtonSegment(value: 'Income', label: Text('Income')),
+        ButtonSegment(value: 'Expense', label: Text('Expense')),
+      ],
+      selected: {value},
+      onSelectionChanged: (s) => onChanged(s.first),
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        selectedForegroundColor: scheme.onSecondaryContainer,
+        selectedBackgroundColor: scheme.secondaryContainer,
       ),
     );
   }
 }
 
-/// DESIGN.md inset grouped list: rows share ONE continuous card with hairline
-/// inset dividers — no per-row card boxes.
+/// MD3 inset grouped list: rows share ONE tonal container with hairline
+/// inset dividers — no per-row card boxes, no shadows.
 class _GroupedList extends StatelessWidget {
   final int itemCount;
   final Widget Function(BuildContext, int) itemBuilder;
@@ -220,12 +196,11 @@ class _GroupedList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColor.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColor.border),
-      ),
+    final scheme = Theme.of(context).colorScheme;
+    return Card.outlined(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: scheme.surfaceContainerLow,
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -233,7 +208,7 @@ class _GroupedList extends StatelessWidget {
         itemCount: itemCount,
         separatorBuilder: (_, __) => Divider(
           height: 1,
-          color: AppColor.border,
+          color: scheme.outlineVariant,
           indent: 64,
           endIndent: 16,
         ),
@@ -245,6 +220,7 @@ class _GroupedList extends StatelessWidget {
 
 /// One transaction row: status icon, date + type, signed amount, delete.
 class _TransactionRow extends StatelessWidget {
+  final ColorScheme scheme;
   final String date;
   final bool isIncome;
   final String amount;
@@ -253,6 +229,7 @@ class _TransactionRow extends StatelessWidget {
   final String deleteLabel;
 
   const _TransactionRow({
+    required this.scheme,
     required this.date,
     required this.isIncome,
     required this.amount,
@@ -263,7 +240,8 @@ class _TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
+    final status = isIncome ? AppColor.income : AppColor.outcome;
+    return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -273,14 +251,12 @@ class _TransactionRow extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: isIncome
-                    ? AppColor.income.withValues(alpha: 0.12)
-                    : AppColor.outcome.withValues(alpha: 0.12),
+                color: status.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                color: isIncome ? AppColor.income : AppColor.outcome,
+                color: status,
                 size: 18,
               ),
             ),
@@ -293,7 +269,7 @@ class _TransactionRow extends StatelessWidget {
                     date,
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
-                      color: AppColor.textPrimary,
+                      color: scheme.onSurface,
                       fontSize: 15,
                     ),
                   ),
@@ -301,7 +277,7 @@ class _TransactionRow extends StatelessWidget {
                   Text(
                     isIncome ? 'Income' : 'Expense',
                     style: TextStyle(
-                      color: isIncome ? AppColor.income : AppColor.outcome,
+                      color: status,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -313,7 +289,7 @@ class _TransactionRow extends StatelessWidget {
               amount,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: isIncome ? AppColor.income : AppColor.textPrimary,
+                color: isIncome ? status : scheme.onSurface,
                 fontSize: 15,
               ),
             ),
@@ -323,7 +299,7 @@ class _TransactionRow extends StatelessWidget {
               button: true,
               child: IconButton(
                 tooltip: 'Delete',
-                icon: Icon(Icons.delete_outline_rounded, color: AppColor.textSecondary, size: 19),
+                icon: Icon(Icons.delete_outline_rounded, color: scheme.onSurfaceVariant, size: 19),
                 onPressed: onDelete,
               ),
             ),

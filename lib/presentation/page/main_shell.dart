@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:cause_money_record/config/app_asset.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/data/source/source_user.dart';
 import 'package:cause_money_record/presentation/controller/c_accounts.dart';
@@ -16,11 +15,15 @@ import 'package:cause_money_record/presentation/page/wallet/wallet_body.dart';
 import 'package:cause_money_record/presentation/widget/floating_nav_bar.dart';
 
 /// Primary navigation shell: Home + Wallet + Transactions in an IndexedStack
-/// under a floating MD3 nav pill, and a standard FAB for the primary
-/// "new entry" action.
+/// under a floating MD3 nav pill, with the "new entry" FAB sitting on the
+/// pill's own row, just to its right.
 ///
 /// The FAB is deliberately NOT contextual: it always means "add transaction"
-/// on every tab, so the action stays predictable wherever you are.
+/// on every tab, so the action stays predictable wherever you are. It lives
+/// inside [FloatingNavBar] rather than in Scaffold.floatingActionButton so the
+/// two can share one row and one vertical center by construction, instead of
+/// being aligned by a hardcoded bottom offset that has to be re-tuned whenever
+/// the pill changes height.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -59,9 +62,15 @@ class _MainShellState extends State<MainShell> {
   /// Tab switch from content (Home's "See all" link into Wallet).
   void goTo(MainTab tab) => setState(() => _tab = tab);
 
-  Future<void> _newEntry() async {
+  /// Opens the New Entry form. The FAB calls it bare; Home's quick actions pass
+  /// the type they stand for and the account card that was on screen, so both
+  /// entry points land on the same form with the same fields.
+  Future<void> _newEntry({String? type, String? accountId}) async {
     HapticFeedback.lightImpact();
-    final result = await Get.to(() => const HistoryFormPage());
+    final result = await Get.to(() => HistoryFormPage(
+          initialType: type,
+          initialAccountId: accountId,
+        ));
     if (result == true) _refresh();
   }
 
@@ -89,7 +98,11 @@ class _MainShellState extends State<MainShell> {
             child: IndexedStack(
               index: _tab.index,
               children: [
-                _TabPage(child: HomeBody(onSeeAll: () => goTo(MainTab.wallet))),
+                _TabPage(
+                    child: HomeBody(
+                        onOpenTransactions: () => goTo(MainTab.transactions),
+                        onQuickAction: (type, accountId) =>
+                            _newEntry(type: type, accountId: accountId))),
                 const _TabPage(child: WalletBody()),
                 const _TabPage(child: HistoryBody()),
               ],
@@ -99,19 +112,13 @@ class _MainShellState extends State<MainShell> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: FloatingNavBar(index: _tab.index, onChanged: _selectTab),
+            child: FloatingNavBar(
+              index: _tab.index,
+              onChanged: _selectTab,
+              onAddPressed: _newEntry,
+            ),
           ),
         ]),
-      ),
-      floatingActionButton: Padding(
-        // Float above the pill — pill height + 16dp margin + safe area.
-        padding: EdgeInsets.only(bottom: 82 + MediaQuery.paddingOf(context).bottom),
-        child: FloatingActionButton(
-          key: const Key('main_new_entry_fab'),
-          onPressed: _newEntry,
-          tooltip: 'Record new entry',
-          child: const Icon(Icons.add),
-        ),
       ),
     );
   }
@@ -132,8 +139,12 @@ class _TabPage extends StatelessWidget {
   }
 }
 
-/// MD3 center-aligned top bar: avatar + greeting + settings + sign out on the
-/// scheme surface. No blur — tonal surface only.
+/// MD3 center-aligned top bar: greeting + settings + sign out on the scheme
+/// surface. No blur — tonal surface only.
+///
+/// No avatar: the greeting is the identity here, and dropping the photo gives
+/// the name the whole leading width instead of the ~52dp the image and its gap
+/// used to take.
 class _TopBar extends StatelessWidget {
   const _TopBar();
 
@@ -148,12 +159,8 @@ class _TopBar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
           child: Row(children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(AppAsset.profile, width: 40, height: 40),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: GetX<CUser>(
+            Expanded(
+                child: GetX<CUser>(
               builder: (c) => Text(
                 c.name.isEmpty ? 'Hi,' : 'Hi, ${c.name}',
                 maxLines: 1,

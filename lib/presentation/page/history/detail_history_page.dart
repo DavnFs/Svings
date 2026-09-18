@@ -73,8 +73,9 @@ class _DetailView extends StatelessWidget {
       }
       final isIncome = d.type == 'Pemasukan';
       final isTransfer = d.type == 'Transfer';
+      final isOpening = d.isOpening;
       final items = d.items;
-      final status = isTransfer
+      final status = isTransfer || isOpening
           ? scheme.primary
           : (isIncome ? scheme.tertiary : scheme.error);
       final accounts = Get.find<CAccounts>();
@@ -85,6 +86,7 @@ class _DetailView extends StatelessWidget {
             total: AppFormat.currency(d.total),
             isIncome: isIncome,
             isTransfer: isTransfer,
+            isOpening: isOpening,
             status: status,
             date: AppFormat.date(d.date),
             notes: d.notes,
@@ -179,10 +181,14 @@ class _HeroCard extends StatelessWidget {
   final String date;
   final String? notes;
 
+  /// An account's opening balance: a credit that is not income.
+  final bool isOpening;
+
   const _HeroCard({
     required this.total,
     required this.isIncome,
     this.isTransfer = false,
+    this.isOpening = false,
     required this.status,
     required this.date,
     required this.notes,
@@ -209,9 +215,11 @@ class _HeroCard extends StatelessWidget {
               child: Icon(
                 isTransfer
                     ? Icons.swap_horiz_rounded
-                    : (isIncome
-                        ? Icons.arrow_downward_rounded
-                        : Icons.arrow_upward_rounded),
+                    : isOpening
+                        ? Icons.flag_outlined
+                        : (isIncome
+                            ? Icons.arrow_downward_rounded
+                            : Icons.arrow_upward_rounded),
                 color: status,
                 size: 24,
               ),
@@ -228,7 +236,9 @@ class _HeroCard extends StatelessWidget {
             Chip(
               label: Text(isTransfer
                   ? 'Transfer'
-                  : (isIncome ? 'Income' : 'Expense')),
+                  : isOpening
+                      ? 'Saldo Awal'
+                      : (isIncome ? 'Income' : 'Expense')),
               backgroundColor: status.withValues(alpha: 0.12),
               labelStyle: TextStyle(
                 color: status,

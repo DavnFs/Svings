@@ -1,3 +1,5 @@
+import 'package:cause_money_record/config/app_account_icon.dart';
+
 /// A money account ("Sumber Dana"): a named, color-coded balance container.
 ///
 /// Balance is DERIVED — income adds, expense subtracts, transfer-out
@@ -13,8 +15,9 @@ class Account {
   /// migration.
   final String kind;
 
-  /// Emoji/glyph shown on the card, e.g. '🏦'. No asset pipeline needed.
-  final String icon;
+  /// A bundled vector icon, not a glyph: the database stores [AccountIcon.key],
+  /// so a row's meaning never depends on a font being present on the device.
+  final AccountIcon icon;
 
   /// ARGB hex string, e.g. '#7C5CFF'.
   final String color;
@@ -24,7 +27,7 @@ class Account {
     required this.userId,
     required this.name,
     this.kind = 'other',
-    this.icon = '💰',
+    this.icon = AccountIcon.other,
     this.color = '#7C5CFF',
   });
 
@@ -32,20 +35,26 @@ class Account {
   /// it on migration.
   static const defaultName = 'Lainnya';
 
-  factory Account.fromSupabase(Map<String, dynamic> json) => Account(
-        id: json['id'].toString(),
-        userId: json['user_id'].toString(),
-        name: json['name'] as String? ?? defaultName,
-        kind: json['kind'] as String? ?? 'other',
-        icon: json['icon'] as String? ?? '💰',
-        color: json['color'] as String? ?? '#7C5CFF',
-      );
+  factory Account.fromSupabase(Map<String, dynamic> json) {
+    final kind = json['kind'] as String? ?? 'other';
+    return Account(
+      id: json['id'].toString(),
+      userId: json['user_id'].toString(),
+      name: json['name'] as String? ?? defaultName,
+      kind: kind,
+      // Legacy rows hold an emoji; fromStored maps those, and anything else it
+      // does not recognise, onto a key for this account's kind. Nothing is
+      // dropped: name, kind and colour read straight through.
+      icon: AccountIcon.fromStored(json['icon'] as String?, kind: kind),
+      color: json['color'] as String? ?? '#7C5CFF',
+    );
+  }
 
   Map<String, dynamic> toInsert(String userId) => {
         'user_id': userId,
         'name': name,
         'kind': kind,
-        'icon': icon,
+        'icon': icon.key,
         'color': color,
       };
 }

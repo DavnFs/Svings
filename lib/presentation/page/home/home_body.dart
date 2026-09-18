@@ -3,22 +3,40 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cause_money_record/config/app_format.dart';
+import 'package:cause_money_record/config/app_motion.dart';
+import 'package:cause_money_record/data/model/account.dart';
 import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_home.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
 import 'package:cause_money_record/presentation/page/history/detail_history_page.dart';
+import 'package:cause_money_record/presentation/widget/account_icon_view.dart';
 import 'package:cause_money_record/presentation/widget/account_widgets.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
-/// The home dashboard — today's total, the weekly bar chart, and the monthly
-/// donut. Extracted from the former HomePage so the [MainShell] can host it as
-/// the first tab of a shared [FloatingNavBar].
-class HomeBody extends StatelessWidget {
-  /// Jump into the Wallet tab (Home's "See all" link). Wired by MainShell so
+/// The home dashboard — the balance carousel, the quick-action row, the weekly
+/// bar chart, and the monthly donut. Extracted from the former HomePage so the
+/// [MainShell] can host it as the first tab of a shared [FloatingNavBar].
+class HomeBody extends StatefulWidget {
+  /// Opens the unfiltered transaction list. The aggregate card uses it; an
+  /// account card pushes its own filtered list instead. Wired by MainShell so
   /// Home never imports the shell — no import cycle.
-  final VoidCallback? onSeeAll;
+  final VoidCallback? onOpenTransactions;
 
-  const HomeBody({super.key, this.onSeeAll});
+  /// Opens the New Entry form, pre-set to [type] and — when the carousel is on
+  /// a specific account rather than the aggregate — to that account. Owned by
+  /// MainShell so Home and the FAB open the same form by the same call.
+  final void Function(String type, String? accountId)? onQuickAction;
+
+  const HomeBody({super.key, this.onOpenTransactions, this.onQuickAction});
+
+  @override
+  State<HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends State<HomeBody> {
+  /// Which account card the carousel is showing, or null for the aggregate.
+  /// The quick actions need it to pre-select the account the user is looking at.
+  String? _activeAccountId;
 
   @override
   Widget build(BuildContext context) {
@@ -54,13 +72,21 @@ class HomeBody extends StatelessWidget {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
-          const _SectionHeader(title: 'Total Balance'),
-          const SizedBox(height: 8),
-          _TodayCard(cHome: cHome),
-          const SizedBox(height: 24),
-          _AccountsHeader(cAccounts: cAccounts, onSeeAll: onSeeAll),
-          const SizedBox(height: 8),
-          _AccountPreview(cAccounts: cAccounts),
+          // Balances only. The account list used to sit below the hero as its
+          // own "Sumber Dana" section; it is now the rest of this carousel, so
+          // Home states each balance once instead of twice.
+          _BalanceCarousel(
+            cHome: cHome,
+            cAccounts: cAccounts,
+            onOpenTransactions: widget.onOpenTransactions,
+            onAccountChanged: (id) {
+              if (id != _activeAccountId) setState(() => _activeAccountId = id);
+            },
+          ),
+          const SizedBox(height: 16),
+          _QuickActions(
+            onTap: (type) => widget.onQuickAction?.call(type, _activeAccountId),
+          ),
           const SizedBox(height: 24),
           const _SectionHeader(title: 'This Week'),
           const SizedBox(height: 8),
@@ -72,6 +98,118 @@ class HomeBody extends StatelessWidget {
         ],
       );
     });
+  }
+}
+
+/// The three things a money tracker records, one tap away: income, expense,
+/// transfer. A shortcut beside the FAB, not a replacement — the FAB still opens
+/// the same form with nothing chosen.
+///
+/// Type icons and colours are the ones the transaction list already uses
+/// (south-west in, north-east out, swap for a transfer), so the row reads as
+/// the same vocabulary rather than a new one.
+class _QuickActions extends StatelessWidget {
+  final void Function(String type) onTap;
+
+  const _QuickActions({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            _QuickActionButton(
+              key: const Key('quick_action_income'),
+              icon: Icons.south_west_rounded,
+              color: scheme.tertiary,
+              label: 'Pemasukan',
+              onTap: () => onTap('Pemasukan'),
+            ),
+            _QuickActionButton(
+              key: const Key('quick_action_expense'),
+              icon: Icons.north_east_rounded,
+              color: scheme.error,
+              label: 'Pengeluaran',
+              onTap: () => onTap('Pengeluaran'),
+            ),
+            _QuickActionButton(
+              key: const Key('quick_action_transfer'),
+              icon: Icons.swap_horiz_rounded,
+              color: scheme.primary,
+              label: 'Transfer',
+              onTap: () => onTap('Transfer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One action: icon over label, an equal third of the row.
+///
+/// Spacing separates the three rather than dividers: against the dark tonal
+/// surface a hairline between them reads as a table cell, while the icons and
+/// the ripple already say where one target ends and the next begins.
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkWell(
+          onTap: onTap,
+          // A minimum, not a height: 56dp is what the cell wants at default
+          // text size, and at larger accessibility sizes the row grows with the
+          // label instead of overflowing the way a fixed box did.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 20, color: color),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -92,132 +230,338 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Hero summary card: aggregate balance across all accounts, with today's
-/// spend below. Charts stay aggregate-only this pass (see below).
-class _TodayCard extends StatelessWidget {
-  final CHome cHome;
+/// Card identity, so a test can tell the two kinds apart while the carousel is
+/// peeking its neighbour into view.
+const _aggregateCardKey = Key('carousel_card_aggregate');
+Key _accountCardKey(String id) => Key('carousel_card_$id');
 
-  const _TodayCard({required this.cHome});
+/// Swipeable balance cards: the aggregate first, then one card per account.
+///
+/// The cards carry their own titles. A separate "Total Balance" header over the
+/// carousel would be wrong the moment it is swiped to an account, and a label
+/// that travels with its card is what makes a swipeable strip readable.
+///
+/// Height is fixed because a PageView needs bounded height inside the page's
+/// scroll; the horizontal drag is claimed by the PageView and vertical drags
+/// fall through to the list, which is the platform's standard arena behaviour.
+class _BalanceCarousel extends StatefulWidget {
+  final CHome cHome;
+  final CAccounts cAccounts;
+  final VoidCallback? onOpenTransactions;
+
+  /// Fires with the account id of the card in view, or null for the aggregate.
+  final ValueChanged<String?>? onAccountChanged;
+
+  const _BalanceCarousel({
+    required this.cHome,
+    required this.cAccounts,
+    this.onOpenTransactions,
+    this.onAccountChanged,
+  });
+
+  /// Tall enough for the tallest card (aggregate: title, amount, today line and
+  /// the details button) at default text size.
+  ///
+  /// A PageView needs a bounded height inside the page's scroll, so the card
+  /// cannot simply be intrinsic — but a title, an amount, a wrapped today line
+  /// and a button do not fit in 196dp once the user's text size grows either.
+  /// The height therefore follows the text scale up to [_maxGrowth]; past that
+  /// the cards would take over the screen, and the lines inside ellipsise.
+  static const baseHeight = 196.0;
+  static const _maxGrowth = 1.8;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      color: scheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Total Balance',
-              style: TextStyle(fontSize: 13, color: scheme.onPrimaryContainer)),
-          Obx(() => Text(
-                AppFormat.currency(cHome.totalBalance),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.onPrimaryContainer,
-                    fontSize: 30),
-              )),
-          const SizedBox(height: 8),
-          Obx(() => Text(
-              'Spent today: ${AppFormat.currency(cHome.today)} (${cHome.todayPercent})',
-              style: TextStyle(
-                  color: scheme.onPrimaryContainer.withValues(alpha: 0.85),
-                  fontSize: 13))),
-          const SizedBox(height: 16),
-          Obx(() {
-            final todayId = cHome.todayId;
-            if (todayId == null) return const SizedBox.shrink();
-            return FilledButton.tonalIcon(
-              onPressed: () =>
-                  Get.to(() => DetailHistoryPage(idHistory: todayId)),
-              icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text('View Details'),
-            );
-          }),
-        ]),
-      ),
-    );
-  }
+  State<_BalanceCarousel> createState() => _BalanceCarouselState();
 }
 
-/// Accounts header with a "See all" link into the Wallet tab. Editing lives
-/// only in Wallet — Home shows read-only previews.
-class _AccountsHeader extends StatelessWidget {
-  final CAccounts cAccounts;
-  final VoidCallback? onSeeAll;
+class _BalanceCarouselState extends State<_BalanceCarousel> {
+  final _controller = PageController(viewportFraction: 0.93);
+  int _page = 0;
 
-  const _AccountsHeader({required this.cAccounts, this.onSeeAll});
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final extra = cAccounts.accounts.length - _AccountPreview.maxPreview;
-      return Row(children: [
-        const Expanded(child: _SectionHeader(title: 'Sumber Dana')),
-        if (extra > 0)
-          TextButton(
-            onPressed: onSeeAll,
-            child: Text('See all ($extra more)',
-                style: const TextStyle(fontSize: 13)),
-          )
-        else
-          TextButton(
-            onPressed: onSeeAll,
-            child: const Text('See all', style: TextStyle(fontSize: 13)),
+      final accounts = widget.cAccounts.accounts;
+      final count = accounts.length + 1;
+      // Accounts can disappear under the carousel (deleted in Wallet); keep the
+      // active page inside the strip that exists now.
+      final active = _page.clamp(0, count - 1);
+      final growth =
+          MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, _BalanceCarousel._maxGrowth);
+      return Column(children: [
+        SizedBox(
+          height: _BalanceCarousel.baseHeight * growth,
+          child: PageView(
+            controller: _controller,
+            // Snap instead of spring when the platform asked for reduced motion.
+            physics: AppMotion.carousel(context),
+            onPageChanged: (i) {
+              setState(() => _page = i);
+              // Page 0 is the aggregate, so it reports "no account".
+              final accounts = widget.cAccounts.accounts;
+              final id =
+                  i > 0 && i <= accounts.length ? accounts[i - 1].id : null;
+              widget.onAccountChanged?.call(id);
+            },
+            children: [
+              _AggregateCard(
+                key: _aggregateCardKey,
+                cHome: widget.cHome,
+                onTap: widget.onOpenTransactions,
+              ),
+              for (final account in accounts)
+                _AccountCard(
+                  key: _accountCardKey(account.id),
+                  cHome: widget.cHome,
+                  cAccounts: widget.cAccounts,
+                  account: account,
+                ),
+            ],
           ),
+        ),
+        if (count > 1) ...[
+          const SizedBox(height: 12),
+          _PageDots(count: count, active: active),
+        ],
       ]);
     });
   }
 }
 
-/// Lightweight preview: up to 4 account cards, balance only. No add/edit
-/// affordances — those live in Wallet. Tapping a card opens its filtered
-/// transaction list.
-class _AccountPreview extends StatelessWidget {
-  static const maxPreview = 4;
+/// Page 0: every account summed, plus today's spend across all of them.
+class _AggregateCard extends StatelessWidget {
+  final CHome cHome;
+  final VoidCallback? onTap;
 
-  final CAccounts cAccounts;
-
-  const _AccountPreview({required this.cAccounts});
+  const _AggregateCard({super.key, required this.cHome, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Obx(() {
-      final accounts = cAccounts.accounts.take(maxPreview).toList();
-      if (accounts.isEmpty) return const SizedBox.shrink();
-      return SizedBox(
-        height: 132,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: accounts.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, i) {
-            final a = accounts[i];
-            final tint = CAccounts.parseColor(a.color);
-            return InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () =>
-                  Get.to(() => AccountTransactionsPage(account: a)),
-              child: Container(
-                width: 168,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border(
-                    left: BorderSide(color: tint, width: 4),
-                  ),
-                ),
-                child: AccountTile(
-                    account: a, balance: cAccounts.balanceOf(a.id)),
+    return _CardShell(
+      color: scheme.primaryContainer,
+      onTap: onTap,
+      // The carousel's height is fixed (a PageView needs bounded height inside
+      // the page's scroll), so every text line here yields to the layout: at
+      // large accessibility sizes the lines shrink or ellipsise rather than
+      // overflowing the card.
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text('Total Balance',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: scheme.onPrimaryContainer.withValues(alpha: 0.9))),
+          ),
+          const SizedBox(height: 6),
+          Flexible(
+            child: _Amount(
+              valueOf: () => cHome.totalBalance,
+              color: scheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Flexible(
+            child: Obx(() => Text(
+                  'Spent today: ${AppFormat.currency(cHome.today)} (${cHome.todayPercent})',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: scheme.onPrimaryContainer.withValues(alpha: 0.85),
+                      fontSize: 13),
+                )),
+          ),
+          const SizedBox(height: 12),
+          Flexible(
+            child: Obx(() {
+              final todayId = cHome.todayId;
+              if (todayId == null) return const SizedBox.shrink();
+              return FilledButton.tonalIcon(
+                onPressed: () =>
+                    Get.to(() => DetailHistoryPage(idHistory: todayId)),
+                icon: const Icon(Icons.arrow_forward, size: 16),
+                label: const Text('View Details', maxLines: 1),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One account's own card: its mark, its name, its balance, and its own
+/// today-spend — the same figure as the aggregate card, scoped to this account.
+class _AccountCard extends StatelessWidget {
+  final CHome cHome;
+  final CAccounts cAccounts;
+  final Account account;
+
+  const _AccountCard({
+    super.key,
+    required this.cHome,
+    required this.cAccounts,
+    required this.account,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tint = CAccounts.parseColor(account.color);
+    return _CardShell(
+      color: tint.withValues(alpha: 0.20),
+      onTap: () => Get.to(() => AccountTransactionsPage(account: account)),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AccountIconView(
+                  icon: account.icon, colorHex: account.color, size: 26),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(account.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface)),
               ),
-            );
-          },
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Read through the Accounts map, not a value captured by the parent:
+          // the card then follows the balance itself, and the Obx inside always
+          // has an observable to register (see _Amount).
+          Flexible(
+            child: _Amount(
+              valueOf: () => cAccounts.balanceOf(account.id),
+              color: scheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Flexible(
+            child: Obx(() => Text(
+                  'Spent today: ${AppFormat.currency(cHome.todaySpendOf(account.id))}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                )),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shared card chrome: the page inset, the rounded tonal surface and the tap
+/// target, so both card kinds look and behave the same.
+class _CardShell extends StatelessWidget {
+  final Color color;
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _CardShell({required this.color, required this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: color,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(padding: const EdgeInsets.all(16), child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// The balance figure. Centred like the rest of the card, tabular so it does
+/// not jitter as digits change, and shrink-only so a long balance stays inside
+/// the card instead of overflowing it.
+///
+/// [valueOf] must read an observable (a controller getter or the balances map):
+/// it is called inside the Obx, and that read is what registers the rebuild.
+/// Passing a plain value throws GetX's "improper use" at build time.
+class _Amount extends StatelessWidget {
+  final double Function() valueOf;
+  final Color color;
+
+  const _Amount({required this.valueOf, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Text(
+          AppFormat.currency(valueOf()),
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
         ),
       );
     });
+  }
+}
+
+/// Which card is showing. The active dot is a wide pill, so position is legible
+/// without counting.
+class _PageDots extends StatelessWidget {
+  final int count;
+  final int active;
+
+  const _PageDots({required this.count, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          AnimatedContainer(
+            key: Key('carousel_dot_$i'),
+            // The pill widens to mark the active card; with reduced motion it is
+            // simply already the right width.
+            duration: AppMotion.maybe(context, const Duration(milliseconds: 200)),
+            curve: Curves.easeOut,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == active ? 18 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: i == active ? scheme.primary : scheme.outlineVariant,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -260,8 +604,11 @@ class _WeeklyChart extends StatelessWidget {
           final maxVal = data.reduce(max).clamp(1.0, double.infinity);
           final hasData = data.any((v) => v > 0);
           if (!hasData) {
+            // 200, not 160: StateView's empty state is ~145dp of icon, title and
+            // message, and 160 leaves it 112 after its own padding, which
+            // overflows on every account with no week data yet.
             return const SizedBox(
-              height: 160,
+              height: 200,
               child: StateView(
                 loading: false,
                 error: null,
@@ -299,16 +646,31 @@ class _WeeklyChart extends StatelessWidget {
                             ),
                           ),
                         const SizedBox(height: 4),
-                        Container(
-                          height: (ratio * 120).clamp(4.0, 120),
-                          decoration: BoxDecoration(
-                              color: scheme.primary,
-                              borderRadius: BorderRadius.circular(4)),
+                        // The bar takes whatever height the labels leave, as a
+                        // fraction of it, instead of a fixed 120dp. That fixed
+                        // number is what overflowed the 160dp cell once the
+                        // labels grew with the user's text size.
+                        Flexible(
+                          fit: FlexFit.tight,
+                          child: FractionallySizedBox(
+                            heightFactor: ratio.clamp(0.03, 1.0),
+                            alignment: Alignment.bottomCenter,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                  color: scheme.primary,
+                                  borderRadius: BorderRadius.circular(4)),
+                              child: const SizedBox(width: double.infinity),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 6),
-                        Text(labels[i],
-                            style: TextStyle(
-                                fontSize: 10, color: scheme.onSurfaceVariant)),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(labels[i],
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 10, color: scheme.onSurfaceVariant)),
+                        ),
                       ],
                     ),
                   ),
@@ -402,15 +764,26 @@ class _MonthlySection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(children: [
-                Text('Difference',
-                    style: TextStyle(
-                        color: scheme.onSurfaceVariant, fontSize: 13)),
-                const Spacer(),
-                Text(AppFormat.currency(cHome.differentMonth),
-                    style: TextStyle(
-                        color: scheme.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700)),
+                Expanded(
+                  child: Text('Difference',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: scheme.onSurfaceVariant, fontSize: 13)),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(AppFormat.currency(cHome.differentMonth),
+                        maxLines: 1,
+                        style: TextStyle(
+                            color: scheme.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ),
               ]),
             ),
           ]);

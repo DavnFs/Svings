@@ -57,21 +57,28 @@ class AppColor {
 
   // Scheme-backed roles carrying dynamic color across call sites.
 
-  static Color get surface => _scheme?.surface ?? (_dark ? _surfaceDark : _surfaceLight);
+  static Color get surface =>
+      _scheme?.surface ?? (_dark ? _surfaceDark : _surfaceLight);
 
   /// One tonal step above the surface. MD3 conveys elevation with tonal
   /// surface colour, not shadows.
-  static Color get card => _scheme?.surfaceContainerLow ?? (_dark ? _cardDark : _cardLight);
+  static Color get card =>
+      _scheme?.surfaceContainerLow ?? (_dark ? _cardDark : _cardLight);
 
-  static Color get border => _scheme?.outlineVariant ?? (_dark ? _borderDark : _borderLight);
-  static Color get textPrimary => _scheme?.onSurface ?? (_dark ? _textPrimaryDark : _textPrimaryLight);
+  static Color get border =>
+      _scheme?.outlineVariant ?? (_dark ? _borderDark : _borderLight);
+  static Color get textPrimary =>
+      _scheme?.onSurface ?? (_dark ? _textPrimaryDark : _textPrimaryLight);
   static Color get textSecondary =>
-      _scheme?.onSurfaceVariant ?? (_dark ? _textSecondaryDark : _textSecondaryLight);
-  static Color get danger => _scheme?.error ?? (_dark ? _dangerDark : _dangerLight);
+      _scheme?.onSurfaceVariant ??
+      (_dark ? _textSecondaryDark : _textSecondaryLight);
+  static Color get danger =>
+      _scheme?.error ?? (_dark ? _dangerDark : _dangerLight);
 
   /// The brand-ish accent: a tonal derivation of the seed, or the wallpaper's
   /// when dynamic colour is in play.
-  static Color get accent => _scheme?.primary ?? (_dark ? _accentDark : _accentLight);
+  static Color get accent =>
+      _scheme?.primary ?? (_dark ? _accentDark : _accentLight);
 
   /// Fill for a primary action.
   static Color get primary => _scheme?.primary ?? const Color(0xFF1A1A2E);
@@ -88,4 +95,39 @@ class AppColor {
   /// per brightness for contrast instead (DESIGN.md strict values).
   static Color get income => _dark ? _incomeDark : _incomeLight;
   static Color get outcome => _dark ? _dangerDark : _dangerLight;
+
+  /// WCAG 2.1 contrast ratio between two opaque colours, from 1 to 21.
+  static double contrastRatio(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final lighter = la > lb ? la : lb;
+    final darker = la > lb ? lb : la;
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  /// The readable foreground for a solid [background] fill: black or white,
+  /// whichever actually contrasts more.
+  ///
+  /// Account cards are filled with the account's own accent, and those accents
+  /// span amber to indigo. Hardcoding white leaves the light ones (amber, lime,
+  /// the bright pinks) unreadable, and hardcoding dark leaves the deep ones
+  /// unreadable, so the choice is made per fill from its luminance.
+  ///
+  /// The candidates are pure black and pure white, not the app's near-black
+  /// text colour. A saturated mid-tone such as #0284C7 reaches only 4.1:1
+  /// against white and 4.0:1 against #111827, but 5.1:1 against black. The two
+  /// extremes cross over at a luminance of about 0.18, where both give 4.58:1,
+  /// so every possible fill clears WCAG AA — a narrower pair cannot promise
+  /// that.
+  ///
+  /// Use this for *every* text tier on a fill. A second tier is carried by size
+  /// and weight — a 15sp w700 name over an 11sp regular kind — never by
+  /// transparency: at 0.8 alpha the brand purple drops to 4.10:1 and
+  /// Mastercard's red to 3.22:1, where full opacity gives 4.83:1 and 4.62:1.
+  static Color onColor(Color background) {
+    return contrastRatio(background, Colors.black) >=
+            contrastRatio(background, Colors.white)
+        ? Colors.black
+        : Colors.white;
+  }
 }

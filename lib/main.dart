@@ -4,6 +4,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:cause_money_record/config/app_color.dart';
+import 'package:cause_money_record/config/app_motion.dart';
+import 'package:cause_money_record/config/app_theme.dart';
+import 'package:cause_money_record/config/display_refresh.dart';
 import 'package:cause_money_record/config/sessions.dart';
 import 'package:cause_money_record/config/supabase_config.dart';
 import 'package:cause_money_record/data/model/user.dart';
@@ -37,6 +40,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID');
 
+  // Ask for the panel's fastest mode before the first frame, so navigation
+  // animation is not capped at 60fps on a high refresh rate phone.
+  await DisplayRefresh.requestHighest();
+
   // Initialize Supabase before runApp so the first frame can hit the API.
   await SupabaseConfig.initialize();
 
@@ -46,54 +53,6 @@ void main() async {
   await Get.find<CSettings>().load();
 
   runApp(const MyApp());
-}
-
-/// Single seed for both schemes. DESIGN.md strict accent: #7C5CFF light.
-const _seed = Color(0xFF7C5CFF);
-
-/// Radius scale per DESIGN.md: 10 chips, 14 inputs/buttons, 18 cards/groups,
-/// 24 sheets/modals.
-const _radiusSmall = 10.0;
-const _radiusButton = 14.0;
-const _radiusCard = 18.0;
-const _radiusSheet = 24.0;
-
-RoundedRectangleBorder _rounded(double radius) =>
-    RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
-
-/// [dynamicScheme] is the wallpaper-derived scheme from `dynamic_color`, present
-/// only on Android 12+. Everywhere else the seed is used, so light and dark
-/// stay a matched pair in both cases.
-ThemeData _buildTheme(Brightness brightness, ColorScheme? dynamicScheme) {
-  final scheme = dynamicScheme ??
-      ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme);
-
-  return base.copyWith(
-    // Ripple needs a visible surface tone to read as a Material layer.
-    scaffoldBackgroundColor: scheme.surface,
-    textTheme: base.textTheme.copyWith(
-      headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
-      titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-      titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      labelSmall: base.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4, fontSize: 11),
-    ),
-    cardTheme: CardThemeData(shape: _rounded(_radiusCard)),
-    dialogTheme: DialogThemeData(shape: _rounded(_radiusSheet)),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        elevation: 0,
-        shape: _rounded(_radiusButton),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        shape: _rounded(_radiusSmall),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-      ),
-    ),
-  );
 }
 
 class MyApp extends StatefulWidget {
@@ -158,8 +117,8 @@ class _MyAppState extends State<MyApp> {
     }
 
     return _ThemedHost(
-      light: _buildTheme(Brightness.light, _lightDynamic),
-      dark: _buildTheme(Brightness.dark, _darkDynamic),
+      light: AppTheme.of(Brightness.light, dynamicScheme: _lightDynamic),
+      dark: AppTheme.of(Brightness.dark, dynamicScheme: _darkDynamic),
     );
   }
 }
@@ -204,6 +163,12 @@ class _ThemedHostState extends State<_ThemedHost> {
       valueListenable: _mode,
       builder: (context, mode, _) => GetMaterialApp(
         debugShowCheckedModeBanner: false,
+        // One app-wide page transition for every Get.to/Get.off/Get.offAll call
+        // site (all of them are GetX, none overrides the transition), so a page
+        // never arrives by accident. See AppMotion for what this resolves to and
+        // why it is the platform motion rather than one shared slide.
+        defaultTransition: AppMotion.pageTransition,
+        transitionDuration: AppMotion.pageTransitionDuration,
         // Wide screens: centered 600px column so the mobile UI never stretches.
         // AppLock wraps INSIDE the constraint so the lock cover fills the app
         // frame on every entry path — there is only one navigator below this.

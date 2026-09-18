@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:cause_money_record/data/model/account_balance.dart';
 import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_settings.dart';
@@ -29,31 +30,18 @@ void main() {
     return outcome;
   }
 
-  // Mirrors SourceAccount.balances: income +, expense −, transfer moves.
-  Map<String, double> balances(List<History> rows) {
-    final out = <String, double>{};
-    for (final r in rows) {
-      switch (r.type) {
-        case 'Pemasukan':
-          if (r.accountId != null) {
-            out[r.accountId!] = (out[r.accountId!] ?? 0) + r.total;
+  // The real balance rule, not a copy of it: a hand-written mirror is a second
+  // source of truth for money math, and it is exactly how a rule like "an
+  // opening balance counts" gets forgotten in one place and not the other.
+  Map<String, double> balances(List<History> rows) => AccountBalance.apply([
+        for (final r in rows)
+          {
+            'type': History.typeToDb(r.type),
+            'total': r.total,
+            'account_id': r.accountId,
+            'transfer_to_account_id': r.transferToAccountId,
           }
-        case 'Pengeluaran':
-          if (r.accountId != null) {
-            out[r.accountId!] = (out[r.accountId!] ?? 0) - r.total;
-          }
-        case 'Transfer':
-          if (r.accountId != null) {
-            out[r.accountId!] = (out[r.accountId!] ?? 0) - r.total;
-          }
-          if (r.transferToAccountId != null) {
-            out[r.transferToAccountId!] =
-                (out[r.transferToAccountId!] ?? 0) + r.total;
-          }
-      }
-    }
-    return out;
-  }
+      ]);
 
   History tx({
     required String type,
@@ -148,8 +136,7 @@ void main() {
     test('MainTab enum matches the pinned shape', () {
       // Direct import: the widget file has no platform channels, only an
       // animation controller that is never constructed here.
-      expect(MainTab.values.map((t) => t.label).toList(),
-          MainTabShape.labels);
+      expect(MainTab.values.map((t) => t.label).toList(), MainTabShape.labels);
     });
   });
 

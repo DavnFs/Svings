@@ -67,6 +67,7 @@ void main() {
           body: FloatingNavBar(
             index: selected.index,
             onChanged: (i) => selected = MainTab.values[i],
+            onAddPressed: () {},
           ),
         ),
       ),
@@ -91,6 +92,7 @@ void main() {
               body: FloatingNavBar(
                 index: selected.index,
                 onChanged: (i) => setState(() => selected = MainTab.values[i]),
+                onAddPressed: () {},
               ),
             );
           },

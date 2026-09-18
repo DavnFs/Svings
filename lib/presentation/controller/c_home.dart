@@ -14,6 +14,17 @@ class CHome extends GetxController {
   final _todayId = RxnString();
   String? get todayId => _todayId.value;
 
+  /// Today's expense per account id. Same rows as [today], grouped by account,
+  /// so an account card on Home can show its own figure without another query.
+  final _todayByAccount = <String, double>{}.obs;
+  Map<String, double> get todayByAccount => _todayByAccount;
+
+  /// Today's spend for one account; the aggregate when [accountId] is null.
+  double todaySpendOf(String? accountId) {
+    if (accountId == null) return _today.value;
+    return _todayByAccount[accountId] ?? 0;
+  }
+
   final _todayPercent = ''.obs;
   String get todayPercent => _todayPercent.value;
 
@@ -65,6 +76,8 @@ class CHome extends GetxController {
 
       _today.value = (data['today'] as num).toDouble();
       _todayId.value = data['todayId'] as String?;
+      _todayByAccount.assignAll(
+          (data['todayByAccount'] as Map?)?.cast<String, double>() ?? const {});
       final yesterday = (data['yesterday'] as num).toDouble();
       final diff = (_today.value - yesterday).abs();
       final denominator = (_today.value + yesterday);

@@ -22,24 +22,36 @@ class SourceHistory {
     try {
       final now = DateTime.now();
       final today = DateFormat('yyyy-MM-dd').format(now);
-      final yesterday =
-          DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 1)));
+      final yesterday = DateFormat('yyyy-MM-dd')
+          .format(now.subtract(const Duration(days: 1)));
       final firstOfMonth = DateFormat('yyyy-MM-01').format(now);
-      final lastOfMonth = DateFormat('yyyy-MM-dd')
-          .format(DateTime(now.year, now.month + 1, 0));
+      final lastOfMonth =
+          DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month + 1, 0));
 
       // Today expense (id retained so the dashboard can link to the entry).
       // Transfers excluded: they move money between accounts, they are not
       // spending. Same exclusion in the week + month queries below.
       final todayResp = await _client
           .from('transactions')
-          .select('id, total')
+          .select('id, total, account_id')
           .eq('user_id', idUser)
           .eq('type', 'expense')
           .eq('date', today)
           .order('created_at', ascending: false);
       final todayTotal = _sum(todayResp);
-      final todayId = todayResp.isEmpty ? null : todayResp.first['id'] as String?;
+      final todayId =
+          todayResp.isEmpty ? null : todayResp.first['id'] as String?;
+
+      // The same rows, grouped by account: each account card on Home shows its
+      // own today spend, scoped from the query the aggregate figure already
+      // runs rather than from a second round trip.
+      final todayByAccount = <String, double>{};
+      for (final row in todayResp) {
+        final id = (row as Map)['account_id']?.toString();
+        if (id == null) continue;
+        final total = ((row)['total'] as num?)?.toDouble() ?? 0;
+        todayByAccount[id] = (todayByAccount[id] ?? 0) + total;
+      }
 
       // Yesterday expense
       final yesterdayResp = await _client
@@ -51,8 +63,8 @@ class SourceHistory {
       final yesterdayTotal = _sum(yesterdayResp);
 
       // Last 7 days
-      final sevenDaysAgo =
-          DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 6)));
+      final sevenDaysAgo = DateFormat('yyyy-MM-dd')
+          .format(now.subtract(const Duration(days: 6)));
       final weekResp = await _client
           .from('transactions')
           .select('date, total')
@@ -91,6 +103,7 @@ class SourceHistory {
       return {
         'today': todayTotal,
         'todayId': todayId,
+        'todayByAccount': todayByAccount,
         'yesterday': yesterdayTotal,
         'week': week,
         'month': {'income': income, 'outcome': outcome},
@@ -100,6 +113,7 @@ class SourceHistory {
       return {
         'today': 0.0,
         'todayId': null,
+        'todayByAccount': <String, double>{},
         'yesterday': 0.0,
         'week': List<double>.filled(7, 0.0),
         'month': {'income': 0.0, 'outcome': 0.0},
@@ -114,15 +128,16 @@ class SourceHistory {
   static Future<bool> add({
     required String idUser,
     required String date,
-    required String type,         // 'Pemasukan' | 'Pengeluaran' | 'Transfer'
+    required String type, // 'Pemasukan' | 'Pengeluaran' | 'Transfer'
     required List<HistoryItem> items,
     String? notes,
-    String source = 'manual',     // 'manual' | 'email'
+    String source = 'manual', // 'manual' | 'email'
     String? rawEmailId,
     String? accountId,
     String? transferToAccountId,
   }) async {
-    final total = items.fold<double>(0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
+    final total = items.fold<double>(
+        0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
     try {
       await _client.from('transactions').insert({
         'user_id': idUser,
@@ -154,17 +169,22 @@ class SourceHistory {
     String? accountId,
     String? transferToAccountId,
   }) async {
-    final total = items.fold<double>(0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
+    final total = items.fold<double>(
+        0, (sum, i) => sum + (double.tryParse(i.price) ?? 0));
     try {
-      await _client.from('transactions').update({
-        'date': date,
-        'type': History.typeToDb(type),
-        'total': total,
-        'notes': notes,
-        'items': items.map((e) => e.toJson()).toList(),
-        'account_id': accountId,
-        'transfer_to_account_id': transferToAccountId,
-      }).eq('id', idHistory).eq('user_id', idUser);
+      await _client
+          .from('transactions')
+          .update({
+            'date': date,
+            'type': History.typeToDb(type),
+            'total': total,
+            'notes': notes,
+            'items': items.map((e) => e.toJson()).toList(),
+            'account_id': accountId,
+            'transfer_to_account_id': transferToAccountId,
+          })
+          .eq('id', idHistory)
+          .eq('user_id', idUser);
       return true;
     } catch (_) {
       return false;
@@ -195,7 +215,8 @@ class SourceHistory {
 
   /// Transactions created by the email sync, newest first — the Settings
   /// "Recent auto-imports" log. Manual entries never appear here.
-  static Future<List<History>> autoImported(String idUser, {int limit = 20}) async {
+  static Future<List<History>> autoImported(String idUser,
+      {int limit = 20}) async {
     try {
       final resp = await _client
           .from('transactions')
@@ -242,12 +263,12 @@ class SourceHistory {
 
   /// Reassigns an auto-imported transaction to another account (Recent
   /// auto-imports log). Type and legs untouched — just the owning account.
-  static Future<bool> reassignAccount(String idHistory, String accountId) async {
+  static Future<bool> reassignAccount(
+      String idHistory, String accountId) async {
     try {
       await _client
           .from('transactions')
-          .update({'account_id': accountId})
-          .eq('id', idHistory);
+          .update({'account_id': accountId}).eq('id', idHistory);
       return true;
     } catch (_) {
       return false;

@@ -18,6 +18,7 @@ import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_settings.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
+import 'package:cause_money_record/presentation/widget/account_widgets.dart';
 
 /// Settings, reached from the top-bar gear. Reads everything from the single
 /// [CSettings] â€” no local duplicates of theme/glass/LLM state.
@@ -623,7 +624,7 @@ class _SenderMappingCardState extends State<_SenderMappingCard> {
                         labelText: 'Account', border: OutlineInputBorder()),
                     items: list
                         .map((a) => DropdownMenuItem(
-                            value: a.id, child: Text('${a.icon} ${a.name}')))
+                            value: a.id, child: AccountDropdownItem(account: a)))
                         .toList(),
                     onChanged: (v) => setState(() => _accountId = v),
                   ),
@@ -873,7 +874,7 @@ class _AutoImportsLogState extends State<_AutoImportsLog> {
               const InputDecoration(border: OutlineInputBorder()),
           items: accounts.accounts
               .map((a) => DropdownMenuItem(
-                  value: a.id, child: Text('${a.icon} ${a.name}')))
+                  value: a.id, child: AccountDropdownItem(account: a)))
               .toList(),
           onChanged: (v) => Navigator.pop(c, v),
         ),

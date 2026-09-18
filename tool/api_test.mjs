@@ -52,10 +52,21 @@ const jsonHeaders = { ...anonHeaders, 'Content-Type': 'application/json' };
 }
 
 // --------------------------------------------------------------------- schema
-for (const table of ['profiles', 'transactions', 'raw_emails']) {
+for (const table of ['profiles', 'transactions', 'raw_emails', 'accounts']) {
   const r = await fetch(`${URL_}/rest/v1/${table}?limit=1`, { headers: anonHeaders });
   if (r.ok) ok(`schema: ${table} exists`);
   else todo(`schema: ${table} missing — apply supabase/apply_all.sql (${r.status})`);
+}
+
+// Columns the app writes that a table check alone would not catch: the accounts
+// feature lives in two places, and one of them silently shipped without the
+// other because this file never learned about it.
+for (const col of ['account_id', 'transfer_to_account_id', 'source']) {
+  const r = await fetch(`${URL_}/rest/v1/transactions?select=${col}&limit=1`, {
+    headers: anonHeaders,
+  });
+  if (r.ok) ok(`schema: transactions.${col} exists`);
+  else todo(`schema: transactions.${col} missing — apply supabase/apply_all.sql (${r.status})`);
 }
 
 // -------------------------------------------------- auth: reject a bad password
@@ -172,6 +183,38 @@ const authHeaders = {
       : bad('delete: row still present');
   } else {
     bad(`create: ${created.status} ${JSON.stringify(createdRows).slice(0, 160)}`);
+  }
+}
+
+// ------------------------------------------------- accounts write round trip
+// The schema check above proves the table is there; this proves the app can
+// actually use it — an insert refused by a missing table or by RLS is exactly
+// the failure that used to look like "my new account didn't appear".
+{
+  const created = await fetch(`${URL_}/rest/v1/accounts`, {
+    method: 'POST',
+    headers: { ...authHeaders, Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: session.user.id,
+      name: 'api-test-account',
+      kind: 'other',
+      icon: 'other',
+      color: '#7C5CFF',
+    }),
+  });
+  const createdRows = await created.json().catch(() => []);
+  const row = Array.isArray(createdRows) ? createdRows[0] : null;
+
+  if (created.status === 201 && row?.id) {
+    ok('accounts: create works (icon stored as an identifier key)');
+
+    const del = await fetch(`${URL_}/rest/v1/accounts?id=eq.${row.id}`, {
+      method: 'DELETE', headers: authHeaders,
+    });
+    del.status === 204 ? ok('accounts: test row removed')
+                       : bad(`accounts: delete ${del.status}`);
+  } else {
+    bad(`accounts: create ${created.status} ${JSON.stringify(createdRows).slice(0, 160)}`);
   }
 }
 

@@ -82,13 +82,13 @@ begin
   delete from public.accounts where user_id in (v_user1_id, v_user2_id);
 
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user1_id, 'Cash', 'cash', '💵', '#059669') returning id into v_cash1;
+    values (v_user1_id, 'Cash', 'cash', 'cash', '#059669') returning id into v_cash1;
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user1_id, 'Bank', 'bank', '🏦', '#0284C7') returning id into v_bank1;
+    values (v_user1_id, 'Bank', 'bank', 'bank', '#0284C7') returning id into v_bank1;
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user2_id, 'Cash', 'cash', '💵', '#059669') returning id into v_cash2;
+    values (v_user2_id, 'Cash', 'cash', 'cash', '#059669') returning id into v_cash2;
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user2_id, 'Bank', 'bank', '🏦', '#0284C7') returning id into v_bank2;
+    values (v_user2_id, 'Bank', 'bank', 'bank', '#0284C7') returning id into v_bank2;
 
   -- User 1: Ahmad Fauzan - 30 days of realistic transactions
   for i in 0..29 loop

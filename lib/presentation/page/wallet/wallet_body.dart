@@ -1,20 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cause_money_record/config/app_color.dart';
 import 'package:cause_money_record/config/app_format.dart';
+import 'package:cause_money_record/data/model/account.dart';
 import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
+import 'package:cause_money_record/presentation/widget/account_icon_view.dart';
 import 'package:cause_money_record/presentation/widget/account_widgets.dart';
 import 'package:cause_money_record/presentation/widget/state_view.dart';
 
-/// Wallet: the single account-management surface. Full vertical account list
-/// (same cards as Home, one per row), tap for detail (edit / history), and
-/// an inline "+ Add account" affordance.
+/// What a hidden balance reads as. Length is fixed on purpose: the eye toggle
+/// must not shuffle the layout it is meant to protect.
+const kMaskedBalance = 'Rp ••••••••';
+
+/// Wallet: the single account-management surface. Two-column grid of account
+/// cards (each filled with its own accent colour), a total with one show/hide
+/// switch for the whole screen, and an "Add account" tile in the last cell.
 ///
 /// Reordering: deliberately NOT built here. Account order is creation order
 /// from the server; drag-to-reorder needs a persisted position (new column +
 /// migration + conflict story for multi-device) — follow-up, not this pass.
-class WalletBody extends StatelessWidget {
+class WalletBody extends StatefulWidget {
   const WalletBody({super.key});
+
+  @override
+  State<WalletBody> createState() => _WalletBodyState();
+}
+
+class _WalletBodyState extends State<WalletBody> {
+  /// One switch for the whole screen. Hiding the total but leaving a card
+  /// readable would not hide anything, so every balance on this screen reads
+  /// this flag — including the detail sheet, which would otherwise print the
+  /// figure the user just hid.
+  bool _visible = true;
 
   @override
   Widget build(BuildContext context) {
@@ -47,90 +65,233 @@ class WalletBody extends StatelessWidget {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
-          Text(AppFormat.currency(cAccounts.total),
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('${accounts.length} account${accounts.length == 1 ? '' : 's'}',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13)),
-          const SizedBox(height: 16),
-          ...accounts.map((a) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _WalletRow(accountId: a.id),
-              )),
-          _AddAccountRow(onAdded: () {}),
+          _TotalHeader(
+            total: cAccounts.total,
+            count: accounts.length,
+            visible: _visible,
+            onToggle: () => setState(() => _visible = !_visible),
+          ),
+          const SizedBox(height: 20),
+          GridView.builder(
+            // Inside the page's own scroll: the grid is content, not a second
+            // scroll region.
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              // A little taller than wide, like a card in a wallet.
+              childAspectRatio: 0.86,
+            ),
+            itemCount: accounts.length + 1,
+            itemBuilder: (context, i) {
+              if (i == accounts.length) {
+                return _AddAccountTile(
+                  key: const Key('wallet_add_account'),
+                  onTap: () => AccountSheet.show(context),
+                );
+              }
+              final account = accounts[i];
+              return _AccountCard(
+                key: Key('wallet_account_${account.id}'),
+                account: account,
+                balance: cAccounts.balanceOf(account.id),
+                visible: _visible,
+                onTap: () => _AccountDetailSheet.show(
+                  context,
+                  accountId: account.id,
+                  visible: _visible,
+                ),
+              );
+            },
+          ),
         ],
       );
     });
   }
 }
 
-/// One Wallet row: the shared AccountTile inside a tonal card, tapping opens
-/// the account detail sheet (edit / view history).
-class _WalletRow extends StatelessWidget {
-  final String accountId;
+/// Total balance with the show/hide switch beside it, and the account count
+/// underneath.
+class _TotalHeader extends StatelessWidget {
+  final double total;
+  final int count;
+  final bool visible;
+  final VoidCallback onToggle;
 
-  const _WalletRow({required this.accountId});
+  const _TotalHeader({
+    required this.total,
+    required this.count,
+    required this.visible,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final cAccounts = Get.find<CAccounts>();
-    return Obx(() {
-      final a = cAccounts.byId(accountId);
-      if (a == null) return const SizedBox.shrink();
-      final tint = CAccounts.parseColor(a.color);
-      return InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => _AccountDetailSheet.show(context, accountId: a.id),
-        child: Container(
-          height: 108,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
-            border: Border(
-              left: BorderSide(color: tint, width: 4),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Total Balance',
+            style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        Row(children: [
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                visible ? AppFormat.currency(total) : kMaskedBalance,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
             ),
           ),
-          child: AccountTile(account: a, balance: cAccounts.balanceOf(a.id)),
-        ),
-      );
-    });
+          const SizedBox(width: 4),
+          IconButton(
+            key: const Key('wallet_toggle_balances'),
+            onPressed: onToggle,
+            tooltip: visible ? 'Hide balances' : 'Show balances',
+            icon: Icon(
+              visible
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 20,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ]),
+        Text('$count account${count == 1 ? '' : 's'}',
+            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
+      ],
+    );
   }
 }
 
-/// Inline "+ Add account" affordance at the end of the Wallet list. Same
-/// AccountSheet Home used to host — one sheet, one creation path.
-class _AddAccountRow extends StatelessWidget {
-  final VoidCallback onAdded;
+/// One account as a filled card: the account's own accent as the fill, its icon
+/// as a bundled vector mark, name in bold, balance, and its kind underneath.
+///
+/// The fill is the account colour itself rather than a tonal tint of it: these
+/// cards are the one place the account's identity is the whole message, and a
+/// 20%-alpha tint reduces six distinct accounts to six shades of the surface.
+/// The foreground is chosen per fill from its luminance, so an amber card does
+/// not get white text.
+class _AccountCard extends StatelessWidget {
+  final Account account;
+  final double balance;
+  final bool visible;
+  final VoidCallback onTap;
 
-  const _AddAccountRow({required this.onAdded});
+  const _AccountCard({
+    super.key,
+    required this.account,
+    required this.balance,
+    required this.visible,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = CAccounts.parseColor(account.color);
+    final foreground = AppColor.onColor(fill);
+    return Material(
+      color: fill,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(account.icon.data, size: 22, color: foreground),
+              const Spacer(),
+              Text(
+                account.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
+                ),
+              ),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  visible ? AppFormat.currency(balance) : kMaskedBalance,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: foreground,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Same full-opacity foreground as the name above it: the tier is
+              // carried by 11sp regular versus 15sp w700, because muting this
+              // over the fill dropped four of the nine accent colours below
+              // WCAG AA (4.10:1 on the brand purple, 3.22:1 on Mastercard red).
+              Text(
+                account.kind,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: foreground),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Last cell of the grid: the add-account affordance, shaped like the cards
+/// around it. A distinct tonal fill rather than a dashed outline — dashes need
+/// a custom painter and read as a hole in the grid, while a tonal tile reads as
+/// an action sitting in the same rhythm as the cards.
+class _AddAccountTile extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AddAccountTile({super.key, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    return Material(
+      color: scheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(18),
-      onTap: () => AccountSheet.show(context),
-      child: Container(
-        height: 64,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_rounded, color: scheme.primary),
-            const SizedBox(width: 4),
-            Text('Add account',
-                style: TextStyle(fontSize: 14, color: scheme.primary)),
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(Icons.add_rounded, size: 26, color: scheme.primary),
+              const SizedBox(height: 8),
+              Text(
+                'Add account',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -139,16 +300,24 @@ class _AddAccountRow extends StatelessWidget {
 
 /// Per-account detail: balance, edit affordance, and a shortcut into that
 /// account's filtered transaction history.
+///
+/// [visible] is the screen's show/hide state, passed in rather than re-read:
+/// a sheet that printed the balance the user just hid would defeat the toggle.
 class _AccountDetailSheet extends StatelessWidget {
   final String accountId;
+  final bool visible;
 
-  const _AccountDetailSheet({required this.accountId});
+  const _AccountDetailSheet({required this.accountId, required this.visible});
 
-  static Future<void> show(BuildContext context,
-          {required String accountId}) =>
+  static Future<void> show(
+    BuildContext context, {
+    required String accountId,
+    required bool visible,
+  }) =>
       showModalBottomSheet(
         context: context,
-        builder: (_) => _AccountDetailSheet(accountId: accountId),
+        builder: (_) =>
+            _AccountDetailSheet(accountId: accountId, visible: visible),
       );
 
   @override
@@ -168,7 +337,7 @@ class _AccountDetailSheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                Text(a.icon, style: const TextStyle(fontSize: 28)),
+                AccountIconView(icon: a.icon, colorHex: a.color, size: 44),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -194,7 +363,10 @@ class _AccountDetailSheet extends StatelessWidget {
                 ),
               ]),
               const SizedBox(height: 16),
-              Text(AppFormat.currency(cAccounts.balanceOf(a.id)),
+              Text(
+                  visible
+                      ? AppFormat.currency(cAccounts.balanceOf(a.id))
+                      : kMaskedBalance,
                   style: Theme.of(context)
                       .textTheme
                       .headlineMedium

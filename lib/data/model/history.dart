@@ -1,11 +1,11 @@
-/// A money-tracker entry (Pemasukan / Pengeluaran / Transfer).
+/// A money-tracker entry (Pemasukan / Pengeluaran / Transfer / Saldo Awal).
 ///
 /// Maps to `public.transactions` in Supabase.
 class History {
   final String? idHistory;
   final String? idUser;
-  final String type;          // 'Pemasukan' / 'Pengeluaran' / 'Transfer' (UI label)
-  final String date;          // 'yyyy-MM-dd'
+  final String type; // 'Pemasukan' / 'Pengeluaran' / 'Transfer' / 'Saldo Awal'
+  final String date; // 'yyyy-MM-dd'
   final double total;
   final String? notes;
   final List<HistoryItem> items;
@@ -16,7 +16,10 @@ class History {
   /// DESTINATION account for transfers; null otherwise.
   final String? transferToAccountId;
 
-  /// 'manual' | 'email'. Drives the Settings auto-imports log filter.
+  /// Where this entry came from: 'manual' | 'email'. This is the transaction's
+  /// ORIGIN, not its account — the account is [accountId], and the data layer
+  /// classes are named `Source*` for the table they read. See SourceAccount's
+  /// doc for the three meanings of the word in this codebase.
   final String source;
 
   /// raw_emails row this came from, if any. Undo deletes the transaction
@@ -42,19 +45,39 @@ class History {
   /// Transfers move money between accounts; they are never income/expense.
   bool get isTransfer => type == 'Transfer';
 
+  /// An account's opening balance: money the account started with. It is not
+  /// income (nothing was earned) and not a transfer (nothing moved between two
+  /// accounts), so it counts toward balances and toward nothing else.
+  bool get isOpening => type == 'Saldo Awal';
+
+  // Database values, in one place because the analysis queries filter on them:
+  // an opening balance must stay out of every income/expense total, and the
+  // cheapest way to guarantee that is for the totals to name their types here
+  // rather than spelling 'income'/'expense' per query.
+  static const dbIncome = 'income';
+  static const dbExpense = 'expense';
+  static const dbTransfer = 'transfer';
+  static const dbOpening = 'opening';
+
+  /// The only types that count as income or expense. `transfer` and `opening`
+  /// are deliberately absent: neither is money earned or spent.
+  static const incomeExpenseDbTypes = [dbIncome, dbExpense];
+
   /// db value -> UI label. Unknown future values fall back to Pengeluaran
   /// (same as before: expense is the safe default for the confirmation UI).
   static String typeFromDb(String? db) => switch (db) {
-        'income' => 'Pemasukan',
-        'transfer' => 'Transfer',
+        dbIncome => 'Pemasukan',
+        dbTransfer => 'Transfer',
+        dbOpening => 'Saldo Awal',
         _ => 'Pengeluaran',
       };
 
   /// UI label -> db value.
   static String typeToDb(String ui) => switch (ui) {
-        'Pemasukan' => 'income',
-        'Transfer' => 'transfer',
-        _ => 'expense',
+        'Pemasukan' => dbIncome,
+        'Transfer' => dbTransfer,
+        'Saldo Awal' => dbOpening,
+        _ => dbExpense,
       };
 
   factory History.fromSupabase(Map<String, dynamic> json) {

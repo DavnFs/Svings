@@ -5,22 +5,22 @@ class AppDialog {
   AppDialog._();
 
   static void success(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColor.income,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    // The fill is the semantic money-in green, which the default snackbar text
+    // colour does not know about: it is chosen against the inverse surface, so
+    // over this green it lands at 3.4:1. onColor picks black or white per fill
+    // and clears AA on both snackbars.
+    _snack(context, message, AppColor.income);
   }
 
   static void error(BuildContext context, String message) {
+    _snack(context, message, AppColor.outcome);
+  }
+
+  static void _snack(BuildContext context, String message, Color fill) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: AppColor.outcome,
+        content: Text(message, style: TextStyle(color: AppColor.onColor(fill))),
+        backgroundColor: fill,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2),

@@ -9,13 +9,26 @@ import 'package:cause_money_record/data/model/history.dart';
 import 'package:cause_money_record/data/source/source_history.dart';
 import 'package:cause_money_record/presentation/controller/c_accounts.dart';
 import 'package:cause_money_record/presentation/controller/c_user.dart';
+import 'package:cause_money_record/presentation/widget/account_widgets.dart';
 import 'package:cause_money_record/presentation/controller/history/c_history_form.dart';
 
 /// Create or edit a transaction. Pass [idHistory] to edit, omit it to create.
+///
+/// [initialType] and [initialAccountId] are the create-only shortcut: Home's
+/// quick actions open this same form with a type and (when a specific account
+/// card is on screen) that account already chosen. Nothing about the form
+/// changes; it just starts where the user already was.
 class HistoryFormPage extends StatefulWidget {
   final String? idHistory;
+  final String? initialType;
+  final String? initialAccountId;
 
-  const HistoryFormPage({super.key, this.idHistory});
+  const HistoryFormPage({
+    super.key,
+    this.idHistory,
+    this.initialType,
+    this.initialAccountId,
+  });
 
   @override
   State<HistoryFormPage> createState() => _HistoryFormPageState();
@@ -24,9 +37,12 @@ class HistoryFormPage extends StatefulWidget {
 class _HistoryFormPageState extends State<HistoryFormPage> {
   late final CHistoryForm c;
   late final CUser cUser;
+
+  /// Only the item name is still typed on the OS keyboard. The amount comes
+  /// from the numeric pad and lives in the controller, so no TextEditingController
+  /// has to be mirrored into Rx (the old transfer path needed exactly that, and
+  /// with it a write-during-build prefill).
   final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _transferAmount = ''.obs;
 
   bool get _isEditing => widget.idHistory != null;
 
@@ -36,44 +52,30 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     c = Get.find<CHistoryForm>();
     cUser = Get.find<CUser>();
     c.reset();
-    _priceController.addListener(() {
-      // Transfer amount is a stateless TextField; mirror it into Rx so the
-      // preview + total + save gate rebuild as the user types.
-      if (c.type == 'Transfer') _transferAmount.value = _priceController.text;
-    });
-    if (_isEditing) c.load(widget.idHistory!);
+    if (_isEditing) {
+      c.load(widget.idHistory!);
+    } else {
+      // Applied after reset(), so a shortcut cannot inherit the previous form's
+      // state. For a transfer this account is the SOURCE, which is what the
+      // controller's accountId means in that type.
+      final type = widget.initialType;
+      if (type != null) c.setType(type);
+      final accountId = widget.initialAccountId;
+      if (accountId != null) c.setAccountId(accountId);
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _priceController.dispose();
     super.dispose();
   }
 
-  /// Prefills the amount field when editing a transfer (load() only fills
-  /// the controller, which does not own a TextEditingController). Called from
-  /// inside Obx — writes the TextField (not Rx) plus the Rx mirror directly,
-  /// so no post-frame callback is needed.
-  void _prefillTransferAmount() {
-    if (_isEditing &&
-        c.type == 'Transfer' &&
-        _priceController.text.isEmpty &&
-        c.items.isNotEmpty) {
-      final price = c.items.first.price;
-      _priceController.text = price == '0' ? '' : price;
-      _transferAmount.value = _priceController.text;
-    }
-  }
-
-  double get _transferTotal =>
-      double.tryParse(_transferAmount.value.trim()) ?? 0;
-
   Future<void> _submit() async {
-    // Transfers carry no items/categories — the amount IS the payload, read
-    // from the single amount field below. Income/expense sum their item rows.
+    // Transfers carry no item rows: the pad amount IS the payload. Income and
+    // expense sum their rows instead.
     final items = c.type == 'Transfer'
-        ? [HistoryItem(name: 'Transfer', price: _transferTotal.toString())]
+        ? [HistoryItem(name: 'Transfer', price: c.amountRaw)]
         : c.items;
     final success = _isEditing
         ? await SourceHistory.update(
@@ -122,14 +124,15 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     if (result != null) c.setDate(DateFormat('yyyy-MM-dd').format(result));
   }
 
+  /// Commits what is on the pad as the next item row, then empties the pad so
+  /// the next amount starts clean.
   void _addItem() {
     final name = _nameController.text.trim();
-    final price = _priceController.text.trim();
-    if (name.isEmpty || price.isEmpty) return;
+    if (name.isEmpty || c.amountValue <= 0) return;
     HapticFeedback.lightImpact();
-    c.addItem(HistoryItem(name: name, price: price));
+    c.addItem(HistoryItem(name: name, price: c.amountRaw));
     _nameController.clear();
-    _priceController.clear();
+    c.clearAmount();
   }
 
   @override
@@ -139,247 +142,288 @@ class _HistoryFormPageState extends State<HistoryFormPage> {
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: AppBar(title: Text(_isEditing ? 'Edit Entry' : 'New Entry')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      // Amount display pinned at the top, pad pinned at the bottom, form in
+      // between: the entry stays visible and reachable no matter where the
+      // scroll sits, which is the whole point of a pad over the OS keyboard.
+      body: Column(
         children: [
-          const _SectionLabel(text: 'Transaction Details'),
-          const SizedBox(height: 8),
-          _FormGroup(
-            child: Column(
+          Obx(() => _AmountDisplay(raw: c.amount)),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                Obx(() => _TypeSegment(c: c)),
-                const SizedBox(height: 14),
-                Divider(height: 1, color: scheme.outlineVariant),
-                const SizedBox(height: 14),
-                _AccountPickers(c: c),
-                const SizedBox(height: 14),
-                Divider(height: 1, color: scheme.outlineVariant),
-                const SizedBox(height: 14),
-                InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: _pickDate,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_today_rounded,
-                            size: 20, color: scheme.primary),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Date',
-                          style: TextStyle(
-                              color: scheme.onSurfaceVariant, fontSize: 14),
-                        ),
-                        const Spacer(),
-                        Obx(
-                          () => Text(
-                            AppFormat.date(c.date),
-                            style: TextStyle(
-                              color: scheme.onSurface,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+                const _SectionLabel(text: 'Transaction Details'),
+                const SizedBox(height: 8),
+                _FormGroup(
+                  child: Column(
+                    children: [
+                      // No Obx here: the segment owns its own reactive scope. An
+                      // Obx at this level would only construct the child, and a
+                      // read made in the child's build registers nothing (GetX
+                      // tracks reads for the duration of the Obx closure alone).
+                      _TypeSegment(c: c),
+                      const SizedBox(height: 14),
+                      Divider(height: 1, color: scheme.outlineVariant),
+                      const SizedBox(height: 14),
+                      _AccountPickers(c: c),
+                      const SizedBox(height: 14),
+                      Divider(height: 1, color: scheme.outlineVariant),
+                      const SizedBox(height: 14),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: _pickDate,
+                        // 14 + a 20dp icon (the tallest child) + 14 = a 48dp tap
+                        // target. It used to be 28dp, the one row on this screen
+                        // under the 44dp minimum, on a primary field. Padding
+                        // rather than a height, so bigger text still grows it.
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 20, color: scheme.primary),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Date',
+                                style: TextStyle(
+                                    color: scheme.onSurfaceVariant,
+                                    fontSize: 14),
+                              ),
+                              const Spacer(),
+                              Obx(
+                                () => Text(
+                                  AppFormat.date(c.date),
+                                  style: TextStyle(
+                                    color: scheme.onSurface,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(Icons.chevron_right_rounded,
+                                  size: 18, color: scheme.onSurfaceVariant),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Icon(Icons.chevron_right_rounded,
-                            size: 18, color: scheme.onSurfaceVariant),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 24),
+                Obx(() => c.type == 'Transfer'
+                    ? const _SectionLabel(text: 'Transfer Amount')
+                    : const _SectionLabel(text: 'Add Item')),
+                const SizedBox(height: 8),
+                _FormGroup(
+                  child: Obx(() {
+                    // Transfers have no item rows: the pad amount is the whole
+                    // payload, and the accounts carry the direction.
+                    if (c.type == 'Transfer') {
+                      return Text(
+                        'The amount above is transferred from the source '
+                        'account to the destination account.',
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 13),
+                      );
+                    }
+                    return Column(
+                      children: [
+                        _ItemField(
+                          controller: _nameController,
+                          hint: 'Item Description (e.g. Lunch)',
+                          icon: Icons.edit_note_rounded,
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: OutlinedButton.icon(
+                            onPressed: _addItem,
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Add to List'),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+                const SizedBox(height: 24),
+                const _SectionLabel(text: 'Recorded Items'),
+                const SizedBox(height: 8),
+                _FormGroup(
+                  child: Obx(() {
+                    // Transfer preview: amount + source -> destination, no rows.
+                    if (c.type == 'Transfer') {
+                      return _TransferPreview(amount: c.amountValue);
+                    }
+                    if (c.items.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Text(
+                            'No items added yet. Add an item above to continue.',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontSize: 13),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: c.items.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: scheme.outlineVariant),
+                          itemBuilder: (context, index) {
+                            final item = c.items[index];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor:
+                                        scheme.surfaceContainerHighest,
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: scheme.onSurfaceVariant),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      item.name,
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: scheme.onSurface),
+                                    ),
+                                  ),
+                                  Text(
+                                    AppFormat.currency(
+                                        num.tryParse(item.price) ?? 0),
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: scheme.onSurface),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    tooltip: 'Remove item',
+                                    visualDensity: VisualDensity.compact,
+                                    icon: Icon(Icons.close_rounded,
+                                        size: 18,
+                                        color: scheme.onSurfaceVariant),
+                                    onPressed: () => c.deleteItem(index),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        Divider(height: 1, color: scheme.outlineVariant),
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total Amount',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: scheme.onSurface,
+                                  fontSize: 15),
+                            ),
+                            Obx(() {
+                              final total = c.type == 'Transfer'
+                                  ? c.amountValue
+                                  : c.total;
+                              return Text(
+                                AppFormat.currency(total),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: c.type == 'Pemasukan'
+                                          ? scheme.tertiary
+                                          : scheme.primary,
+                                    ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: Obx(() {
+                    // The reads happen right here, in the closure: this is what
+                    // registers the button's rebuilds. The gate below is a pure
+                    // function so a later refactor cannot quietly move the reads
+                    // out of the closure and kill the reactivity.
+                    final enabled = _canSubmit(
+                      type: c.type,
+                      accountId: c.accountId,
+                      transferToAccountId: c.transferToAccountId,
+                      itemCount: c.items.length,
+                      amount: c.amountValue,
+                    );
+                    return FilledButton(
+                      onPressed: enabled ? _submit : null,
+                      child: Text(
+                          _isEditing ? 'Save Changes' : 'Save Transaction'),
+                    );
+                  }),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          Obx(() => c.type == 'Transfer'
-              ? const _SectionLabel(text: 'Transfer Amount')
-              : const _SectionLabel(text: 'Add Item')),
-          const SizedBox(height: 8),
-          _FormGroup(
-            child: Obx(() {
-              // Transfers have no item rows — one amount + two accounts.
-              // _transferAmount is the reactive source; the TextField is not.
-              if (c.type == 'Transfer') {
-                _prefillTransferAmount();
-                return _ItemField(
-                  controller: _priceController,
-                  hint: 'Amount (Rp)',
-                  icon: Icons.payments_outlined,
-                  isNumber: true,
-                );
-              }
-              return Column(
-                children: [
-                  _ItemField(
-                    controller: _nameController,
-                    hint: 'Item Description (e.g. Lunch)',
-                    icon: Icons.edit_note_rounded,
-                  ),
-                  const SizedBox(height: 12),
-                  _ItemField(
-                    controller: _priceController,
-                    hint: 'Amount (Rp)',
-                    icon: Icons.payments_outlined,
-                    isNumber: true,
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: OutlinedButton.icon(
-                      onPressed: _addItem,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add to List'),
-                    ),
-                  ),
-                ],
-              );
-            }),
-          ),
-          const SizedBox(height: 24),
-          const _SectionLabel(text: 'Recorded Items'),
-          const SizedBox(height: 8),
-          _FormGroup(
-            child: Obx(() {
-              // Transfer preview: amount + source -> destination, no rows.
-              // _transferAmount (not the TextField) so typing rebuilds this.
-              if (c.type == 'Transfer') {
-                _prefillTransferAmount();
-                return _TransferPreview(amount: _transferTotal);
-              }
-              if (c.items.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'No items added yet. Add an item above to continue.',
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 13),
-                    ),
-                  ),
-                );
-              }
-
-              return Column(
-                children: [
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: c.items.length,
-                    separatorBuilder: (_, __) =>
-                        Divider(height: 1, color: scheme.outlineVariant),
-                    itemBuilder: (context, index) {
-                      final item = c.items[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: scheme.surfaceContainerHighest,
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: scheme.onSurfaceVariant),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                item.name,
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: scheme.onSurface),
-                              ),
-                            ),
-                            Text(
-                              AppFormat.currency(num.tryParse(item.price) ?? 0),
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: scheme.onSurface),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              tooltip: 'Remove item',
-                              visualDensity: VisualDensity.compact,
-                              icon: Icon(Icons.close_rounded,
-                                  size: 18, color: scheme.onSurfaceVariant),
-                              onPressed: () => c.deleteItem(index),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  Divider(height: 1, color: scheme.outlineVariant),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Amount',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurface,
-                            fontSize: 15),
-                      ),
-                      Obx(() {
-                        final total = c.type == 'Transfer'
-                            ? _transferTotal
-                            : c.total;
-                        return Text(
-                          AppFormat.currency(total),
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: c.type == 'Pemasukan'
-                                    ? scheme.tertiary
-                                    : scheme.primary,
-                              ),
-                        );
-                      }),
-                    ],
-                  ),
-                ],
-              );
-            }),
-          ),
-          const SizedBox(height: 28),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: Obx(
-              () => FilledButton(
-                onPressed: _canSubmit() ? _submit : null,
-                child: Text(_isEditing ? 'Save Changes' : 'Save Transaction'),
-              ),
-            ),
-          ),
         ],
+      ),
+      // The pad is chrome, not content: keeping it out of the scroll means the
+      // amount is always one tap away and never scrolls under the form.
+      bottomNavigationBar: _AmountKeypad(
+        onKey: c.pushAmount,
+        onBackspace: c.popAmount,
       ),
     );
   }
 
   /// Save gate per type: income/expense need an item row; transfers need an
-  /// amount plus two DISTINCT accounts. Reads _transferTotal (Rx-backed) so
-  /// the button enables as the user types.
-  bool _canSubmit() {
-    if (c.type == 'Transfer') {
-      return _transferTotal > 0 &&
-          c.accountId != null &&
-          c.transferToAccountId != null &&
-          c.accountId != c.transferToAccountId;
+  /// amount plus two DISTINCT accounts. Pure by design — the caller passes the
+  /// values it read from Rx (see the Obx above), so the dependency list lives
+  /// at the reactive boundary instead of inside here.
+  static bool _canSubmit({
+    required String type,
+    required String? accountId,
+    required String? transferToAccountId,
+    required int itemCount,
+    required double amount,
+  }) {
+    if (type == 'Transfer') {
+      return amount > 0 &&
+          accountId != null &&
+          transferToAccountId != null &&
+          accountId != transferToAccountId;
     }
-    return c.items.isNotEmpty;
+    return itemCount > 0;
   }
 }
 
@@ -393,35 +437,41 @@ class _TypeSegment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(
-          value: 'Pemasukan',
-          label: Text('Income'),
-          icon: Icon(Icons.arrow_downward_rounded, size: 16),
+    // The Obx lives here, around the control it reactivates, and reads c.type
+    // inside its own closure. Reads made one level down (in a child's build)
+    // happen after the closure returns and would register nothing.
+    return Obx(() {
+      final selected = c.type;
+      return SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(
+            value: 'Pemasukan',
+            label: Text('Income'),
+            icon: Icon(Icons.arrow_downward_rounded, size: 16),
+          ),
+          ButtonSegment(
+            value: 'Pengeluaran',
+            label: Text('Expense'),
+            icon: Icon(Icons.arrow_upward_rounded, size: 16),
+          ),
+          ButtonSegment(
+            value: 'Transfer',
+            label: Text('Transfer'),
+            icon: Icon(Icons.swap_horiz_rounded, size: 16),
+          ),
+        ],
+        selected: {selected},
+        onSelectionChanged: (s) {
+          HapticFeedback.selectionClick();
+          c.setType(s.first);
+        },
+        showSelectedIcon: false,
+        style: SegmentedButton.styleFrom(
+          selectedForegroundColor: scheme.onSecondaryContainer,
+          selectedBackgroundColor: scheme.secondaryContainer,
         ),
-        ButtonSegment(
-          value: 'Pengeluaran',
-          label: Text('Expense'),
-          icon: Icon(Icons.arrow_upward_rounded, size: 16),
-        ),
-        ButtonSegment(
-          value: 'Transfer',
-          label: Text('Transfer'),
-          icon: Icon(Icons.swap_horiz_rounded, size: 16),
-        ),
-      ],
-      selected: {c.type},
-      onSelectionChanged: (s) {
-        HapticFeedback.selectionClick();
-        c.setType(s.first);
-      },
-      showSelectedIcon: false,
-      style: SegmentedButton.styleFrom(
-        selectedForegroundColor: scheme.onSecondaryContainer,
-        selectedBackgroundColor: scheme.secondaryContainer,
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -508,9 +558,11 @@ class _AccountDropdown extends StatelessWidget {
     final effective = ids.contains(value) ? value : accounts.first.id;
     return DropdownButtonFormField<String>(
       initialValue: effective,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      decoration:
+          InputDecoration(labelText: label, border: const OutlineInputBorder()),
       items: accounts
-          .map((a) => DropdownMenuItem(value: a.id, child: Text('${a.icon} ${a.name}')))
+          .map((a) => DropdownMenuItem(
+              value: a.id, child: AccountDropdownItem(account: a)))
           .toList(),
       onChanged: onChanged,
     );
@@ -535,14 +587,13 @@ class _TransferPreview extends StatelessWidget {
       final to = accounts.byId(Get.find<CHistoryForm>().transferToAccountId);
       return Row(children: [
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppFormat.currency(amount),
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w800, color: scheme.onSurface)),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800, color: scheme.onSurface)),
             const SizedBox(height: 4),
-            Text('${from?.name ?? '—'}  →  ${to?.name ?? '—'}',
+            Text('${from?.name ?? '-'}  →  ${to?.name ?? '-'}',
                 style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
           ]),
         ),
@@ -569,25 +620,179 @@ class _FormGroup extends StatelessWidget {
   }
 }
 
+/// The amount being keyed, live-formatted as Rupiah while the pad is tapped.
+///
+/// Shrink-only scaling and tabular figures: the number grows into five or six
+/// digits without the text jittering sideways or pushing the layout around, and
+/// it never overflows the row it sits in.
+class _AmountDisplay extends StatelessWidget {
+  final String raw;
+
+  const _AmountDisplay({required this.raw});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      color: scheme.surfaceContainerLow,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Amount',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              AppFormat.typedCurrency(raw),
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: raw.isEmpty ? scheme.onSurfaceVariant : scheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Numeric pad for the amount: digits, a comma for sen, and backspace.
+///
+/// Every key is a full 56dp tall Material target with a ripple, and every key
+/// carries a label for screen readers (the backspace is an icon, so it gets an
+/// explicit one). No OS keyboard is involved, which is the point: it keeps the
+/// form, the accounts and the amount on screen together.
+class _AmountKeypad extends StatelessWidget {
+  final ValueChanged<String> onKey;
+  final VoidCallback onBackspace;
+
+  const _AmountKeypad({required this.onKey, required this.onBackspace});
+
+  static const _rows = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    [',', '0', 'backspace'],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainer,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final row in _rows)
+                Row(
+                  children: [
+                    for (final key in row)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: key == 'backspace'
+                              ? _KeyButton(
+                                  key: const Key('keypad_backspace'),
+                                  onTap: onBackspace,
+                                  label: 'Backspace',
+                                  child: Icon(
+                                    Icons.backspace_outlined,
+                                    size: 22,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : _KeyButton(
+                                  key: Key('keypad_$key'),
+                                  onTap: () => onKey(key),
+                                  label: key == ',' ? 'Comma' : key,
+                                  child: Text(
+                                    key,
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w600,
+                                      color: scheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One pad key: 56dp tall tonal target, ripple, and a screen-reader label.
+class _KeyButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final String label;
+  final Widget child;
+
+  const _KeyButton({
+    super.key,
+    required this.onTap,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(height: 56, child: Center(child: child)),
+        ),
+      ),
+    );
+  }
+}
+
 /// MD3 outlined input: scheme outline, primary focus ring.
 class _ItemField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final IconData icon;
-  final bool isNumber;
 
   const _ItemField({
     required this.controller,
     required this.hint,
     required this.icon,
-    this.isNumber = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon, size: 18),

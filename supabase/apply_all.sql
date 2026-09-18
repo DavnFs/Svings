@@ -387,6 +387,146 @@ create policy "accounts_delete_own"
 
 
 -- #####################################################################
+-- ## migrations/20260101000005_account_icons.sql
+-- #####################################################################
+
+-- =====================================================================
+-- Migration: 20260101000005_account_icons.sql
+-- Purpose : account icons become stable identifiers instead of emoji glyphs.
+-- Order    : Run after 20260101000004_accounts_rls.sql.
+--
+-- Only the icon REPRESENTATION changes. name, kind, color, created_at and the
+-- derived balances are untouched, and no row is deleted: a value the app does
+-- not recognise falls back to the generic mark for that account's kind.
+--
+-- The same mapping lives in Dart (AccountIcon.fromStored), so rows read
+-- correctly even against a database where this migration has not run yet.
+-- =====================================================================
+
+-- Step 1: the emoji this app used to store -> its identifier.
+update public.accounts
+   set icon = case icon
+                when '🏦' then 'bank'
+                when '👛' then 'wallet'
+                when '💵' then 'cash'
+                when '💰' then 'savings'
+                when '💳' then 'card'
+                when '🐷' then 'savings'
+                else icon
+              end
+ where icon in ('🏦', '👛', '💵', '💰', '💳', '🐷');
+
+-- Step 2: anything left that is neither a known emoji nor a current key
+-- (a glyph from an older build, a hand-edited row) falls back by kind.
+update public.accounts
+   set icon = case kind
+                when 'bank' then 'bank'
+                when 'e-wallet' then 'wallet'
+                when 'cash' then 'cash'
+                else 'other'
+              end
+ where icon not in (
+   -- brands
+   'gojek', 'shopee', 'grab', 'visa', 'mastercard', 'paypal', 'blibli',
+   'bukalapak',
+   -- generics
+   'cash', 'bank', 'wallet', 'card', 'savings', 'other'
+ );
+
+-- New rows get a valid key by default too, instead of the old emoji.
+alter table public.accounts alter column icon set default 'wallet';
+
+comment on column public.accounts.icon is
+  'Account icon identifier key (see AccountIcon in the app), not a glyph.';
+
+-- =====================================================================
+-- Done.
+-- =====================================================================
+
+
+-- #####################################################################
+-- ## migrations/20260101000006_account_opening.sql
+-- #####################################################################
+
+-- =====================================================================
+-- Migration: 20260101000006_account_opening.sql
+-- Purpose : a "Saldo Awal" (opening balance) for new accounts, written
+--           atomically with the account itself.
+-- Order    : Run after 20260101000005_account_icons.sql.
+--
+-- Why a transaction type rather than a column on accounts: balance is DERIVED
+-- from the ledger everywhere in this app (SourceAccount.balances, the Home
+-- total, the account cards). A stored balance column would drift from the
+-- ledger the first time a write half-succeeded, with no way to say which of the
+-- two is right. An opening balance is therefore just the account's first
+-- ledger entry, and every balance rule keeps working unchanged.
+--
+-- 'opening' counts toward that account's balance and toward nothing else: it is
+-- absent from every income/expense aggregate (those query
+-- type in ('income','expense')), exactly like 'transfer'.
+-- =====================================================================
+
+do $$ begin
+  alter type transaction_type add value if not exists 'opening';
+exception when duplicate_object then null; end $$;
+
+-- ---------------------------------------------------------------------
+-- create_account_with_opening — one account, and its opening entry, or
+-- neither.
+--
+-- A function body is one transaction, so a failure between the two inserts
+-- rolls both back: there can be no account whose balance has no entry behind
+-- it, and no entry pointing at an account that does not exist.
+--
+-- security invoker: the inserts run as the caller, so the accounts and
+-- transactions RLS policies still apply. No security definer shortcut.
+-- ---------------------------------------------------------------------
+create or replace function public.create_account_with_opening(
+  p_user    uuid,
+  p_name    text,
+  p_kind    text default 'other',
+  p_icon    text default 'other',
+  p_color   text default '#7C5CFF',
+  p_opening numeric default 0,
+  p_date    date default current_date
+) returns public.accounts
+language plpgsql
+security invoker
+as $$
+declare
+  created public.accounts;
+begin
+  insert into public.accounts (user_id, name, kind, icon, color)
+    values (p_user, p_name, p_kind, p_icon, p_color)
+    returning * into created;
+
+  -- Only a real opening balance writes an entry. A zero would leave a
+  -- meaningless row in the ledger that the user never asked for.
+  if p_opening is not null and p_opening > 0 then
+    insert into public.transactions
+      (user_id, type, date, total, items, source, account_id)
+      values (
+        p_user,
+        'opening',
+        p_date,
+        p_opening,
+        jsonb_build_array(
+          jsonb_build_object('name', 'Saldo Awal', 'price', p_opening::text)
+        ),
+        'manual',
+        created.id
+      );
+  end if;
+
+  return created;
+end $$;
+
+-- =====================================================================
+-- Done.
+-- =====================================================================
+
+
+-- #####################################################################
 -- ## seed/99_demo_users.sql
 -- #####################################################################
 
@@ -474,13 +614,13 @@ begin
   delete from public.accounts where user_id in (v_user1_id, v_user2_id);
 
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user1_id, 'Cash', 'cash', '💵', '#059669') returning id into v_cash1;
+    values (v_user1_id, 'Cash', 'cash', 'cash', '#059669') returning id into v_cash1;
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user1_id, 'Bank', 'bank', '🏦', '#0284C7') returning id into v_bank1;
+    values (v_user1_id, 'Bank', 'bank', 'bank', '#0284C7') returning id into v_bank1;
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user2_id, 'Cash', 'cash', '💵', '#059669') returning id into v_cash2;
+    values (v_user2_id, 'Cash', 'cash', 'cash', '#059669') returning id into v_cash2;
   insert into public.accounts (user_id, name, kind, icon, color)
-    values (v_user2_id, 'Bank', 'bank', '🏦', '#0284C7') returning id into v_bank2;
+    values (v_user2_id, 'Bank', 'bank', 'bank', '#0284C7') returning id into v_bank2;
 
   -- User 1: Ahmad Fauzan - 30 days of realistic transactions
   for i in 0..29 loop
